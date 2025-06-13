@@ -3,14 +3,10 @@
 import { ThemeProvider } from "@/components/theme-provider"
 import Loading from "@/components/loading"
 import { usePathname, useSearchParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import type { ReactNode } from "react"
 
-export default function ClientLayout({
-  children,
-}: {
-  children: ReactNode
-}) {
+function LoadingWrapper({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -35,6 +31,19 @@ export default function ClientLayout({
   }, [pathname, searchParams]);
 
   return (
+    <>
+      {isLoading && <Loading />}
+      {children}
+    </>
+  );
+}
+
+export default function ClientLayout({
+  children,
+}: {
+  children: ReactNode
+}) {
+  return (
     <ThemeProvider
       attribute="class"
       defaultTheme="dark"
@@ -42,8 +51,9 @@ export default function ClientLayout({
       storageKey="replin-theme"
       disableTransitionOnChange
     >
-      {isLoading && <Loading />}
-      {children}
+      <Suspense fallback={<Loading />}>
+        <LoadingWrapper>{children}</LoadingWrapper>
+      </Suspense>
     </ThemeProvider>
   );
 } 
