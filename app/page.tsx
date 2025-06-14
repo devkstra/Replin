@@ -38,6 +38,8 @@ export default function Home() {
   const [initialScrollY, setInitialScrollY] = useState(0);
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastScrollTime = useRef<number>(0);
+  const [isVideoLoaded, setIsVideoLoaded] = useState(false);
+  const [isVideoError, setIsVideoError] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -158,6 +160,33 @@ export default function Home() {
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
   };
+
+  // Add this useEffect to handle video loading
+  useEffect(() => {
+    if (videoRef.current) {
+      // Check if video is already loaded
+      if (videoRef.current.readyState >= 3) {
+        setIsVideoLoaded(true);
+      }
+
+      // Add event listeners for all possible load events
+      const handleLoad = () => setIsVideoLoaded(true);
+      
+      videoRef.current.addEventListener('loadeddata', handleLoad);
+      videoRef.current.addEventListener('canplay', handleLoad);
+      videoRef.current.addEventListener('error', (e) => {
+        console.error('Video loading error:', e);
+        setIsVideoError(true);
+      });
+
+      return () => {
+        if (videoRef.current) {
+          videoRef.current.removeEventListener('loadeddata', handleLoad);
+          videoRef.current.removeEventListener('canplay', handleLoad);
+        }
+      };
+    }
+  }, []);
 
   const MobileHeroSection = () => (
     <section className="relative min-h-screen">
@@ -738,7 +767,7 @@ export default function Home() {
               viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
               className="relative group"
-            >
+          >
               <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
               <motion.div 
                 whileHover={{ scale: 1.02, y: -8 }}
@@ -773,7 +802,7 @@ export default function Home() {
                     viewport={{ once: true }}
                     transition={{ duration: 0.4, delay: 0.4 }}
                     className="text-xl text-white/80 leading-relaxed"
-                  >
+                >
                     Your Voice Agent,
                     <br />
                     On Us
@@ -1020,7 +1049,7 @@ export default function Home() {
             <button 
               onClick={toggleMobileMenu}
               className="md:hidden text-white p-2"
-            >
+              >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
@@ -1037,10 +1066,23 @@ export default function Home() {
       ) : (
         <section className="relative min-h-[300vh] -mx-8 -mt-8">
           <div className="sticky top-0 h-screen w-full overflow-hidden">
+            {/* Loading State - Show only for 3 seconds max */}
+            {!isVideoLoaded && !isVideoError && (
+              <motion.div 
+                initial={{ opacity: 1 }}
+                animate={{ opacity: 0 }}
+                transition={{ duration: 0.5, delay: 3 }}
+                onAnimationComplete={() => setIsVideoLoaded(true)}
+                className="absolute inset-0 bg-black flex items-center justify-center z-[3]"
+              >
+                <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+              </motion.div>
+            )}
+
             {/* Video Background */}
             <video 
               ref={videoRef}
-              className="absolute inset-0 w-full h-full object-cover"
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}`}
               src="/video2.mp4"
               muted
               playsInline
@@ -1048,6 +1090,11 @@ export default function Home() {
             >
               <source src="/video2.mp4" type="video/mp4" />
             </video>
+
+            {/* Fallback for Video Error */}
+            {isVideoError && (
+              <div className="absolute inset-0 bg-gradient-to-b from-black/50 to-black"></div>
+            )}
 
             {/* Dynamic Bottom-Up Overlay */}
             <div 
@@ -1058,7 +1105,7 @@ export default function Home() {
             />
 
             {/* Content Overlay */}
-            <div className="absolute inset-0 flex flex-col justify-end pb-16 items-center text-white z-[1]">
+            <div className="absolute inset-0 flex flex-col justify-end pb-16 items-center text-white z-[4]">
                     <motion.h1 
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -1441,7 +1488,7 @@ export default function Home() {
                     viewport={{ once: true }}
                 transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
                 className="text-[4.5rem] font-medium mb-4"
-              >
+                  >
                 The Hype Is Building!
                   </motion.h2>
               <motion.p
@@ -1643,7 +1690,7 @@ export default function Home() {
           viewport={{ once: true }}
               transition={{ duration: 0.8 }}
               className="mb-16"
-            >
+        >
               <h2 className="text-[4.5rem] font-medium leading-tight mb-4">
                 <motion.span
                   initial={{ opacity: 0, x: -20 }}
@@ -1771,7 +1818,7 @@ export default function Home() {
                         viewport={{ once: true }}
                       transition={{ duration: 0.4, delay: 0.6 }}
                       className="text-xl text-white/80 leading-relaxed"
-                    >
+                      >
                       Enterprise-grade
                       <br />
                       power. Request
@@ -1810,7 +1857,7 @@ export default function Home() {
           viewport={{ once: true }}
               transition={{ duration: 0.8 }}
               className="mb-16"
-            >
+        >
               <h2 className="text-[4.5rem] font-medium leading-tight mb-4">
                 <motion.span
                   initial={{ opacity: 0, x: -20 }}
@@ -1958,7 +2005,7 @@ export default function Home() {
                   viewport={{ once: true }}
                       transition={{ duration: 0.4, delay: 0.6 }}
                       className="text-xl text-white/80 leading-relaxed"
-                    >
+                >
                       Looking for a custom solution?
                       <br />
                       Our enterprise team is here to help
