@@ -9,10 +9,35 @@ import { useRouter } from "next/navigation"
 import { motion, useInView } from "framer-motion"
 import { useRef, useState, useEffect } from "react"
 
+// At the top of the file, after the imports
+const scrollbarHideStyles = {
+  scrollbarWidth: 'none',  // Firefox
+  msOverflowStyle: 'none',  // IE 10+
+  '&::-webkit-scrollbar': {
+    display: 'none'  // Chrome, Safari, newer versions of Opera
+  }
+} as const;
+
+// Add this keyframe animation at the top of the file after imports
+const borderGlowKeyframes = {
+  '0%': { backgroundPosition: '0% 0%' },
+  '100%': { backgroundPosition: '200% 0%' }
+} as const;
+
 export default function Home() {
   const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isFeatureSectionHovered, setIsFeatureSectionHovered] = useState(false);
+  const [featureScrollProgress, setFeatureScrollProgress] = useState(0);
+  const featureSectionRef = useRef<HTMLDivElement>(null);
+  const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
+  const featuresContainerRef = useRef<HTMLDivElement>(null);
+  const [initialScrollY, setInitialScrollY] = useState(0);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastScrollTime = useRef<number>(0);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -24,6 +49,95 @@ export default function Home() {
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!videoRef.current || isFeatureSectionHovered) return;
+      
+      const scrollPosition = window.scrollY;
+      const maxScroll = window.innerHeight * 2; // Adjust this value to control scroll length
+      const progress = Math.min(Math.max(scrollPosition / maxScroll, 0), 1);
+      
+      setScrollProgress(progress);
+      
+      // Only update video time if we have a valid progress value
+      if (isFinite(progress) && videoRef.current.duration) {
+      videoRef.current.currentTime = progress * videoRef.current.duration;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isFeatureSectionHovered]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!featureSectionRef.current) return;
+      
+      const rect = featureSectionRef.current.getBoundingClientRect();
+      // Check if the section is near the viewport top
+      if (rect.top <= 50 && rect.top >= -50 && !isFeatureSectionHovered) {
+        setIsFeatureSectionHovered(true);
+        document.body.style.overflow = 'hidden';
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isFeatureSectionHovered]);
+
+  useEffect(() => {
+    const handleFeatureScroll = (e: WheelEvent) => {
+      if (!featureSectionRef.current || !isFeatureSectionHovered) return;
+      
+      e.preventDefault();
+      
+      // Check if enough time has passed since last scroll
+      const now = Date.now();
+      if (now - lastScrollTime.current < 150) { // Adjust this value to control sensitivity
+        return;
+      }
+      lastScrollTime.current = now;
+
+      const delta = e.deltaY;
+      const isScrollingDown = delta > 0;
+      
+      // Only allow exiting the section when at the last feature and scrolling down
+      // or at the first feature and scrolling up
+      if ((isScrollingDown && currentFeatureIndex === 2) || 
+          (!isScrollingDown && currentFeatureIndex === 0)) {
+        setIsFeatureSectionHovered(false);
+        document.body.style.overflow = '';
+        
+        setTimeout(() => {
+          const scrollOffset = isScrollingDown ? 100 : -100;
+          window.scrollBy({ top: scrollOffset, behavior: 'smooth' });
+        }, 100);
+        return;
+      }
+      
+      // Update feature index
+      if (isScrollingDown && currentFeatureIndex < 2) {
+        setCurrentFeatureIndex(prev => prev + 1);
+      } else if (!isScrollingDown && currentFeatureIndex > 0) {
+        setCurrentFeatureIndex(prev => prev - 1);
+      }
+    };
+
+    const featureSection = featureSectionRef.current;
+    if (isFeatureSectionHovered && featureSection) {
+      featureSection.addEventListener('wheel', handleFeatureScroll, { passive: false });
+      return () => {
+        featureSection.removeEventListener('wheel', handleFeatureScroll);
+      };
+    }
+  }, [isFeatureSectionHovered, currentFeatureIndex]);
+
+  const handleFeatureIndicatorClick = (index: number) => {
+    if (index !== currentFeatureIndex) {
+      setCurrentFeatureIndex(index);
+    }
+  };
 
   const handleSignIn = () => {
     router.push('/signin');
@@ -588,106 +702,163 @@ export default function Home() {
         <div className="mx-4">
           {/* Section Title */}
           <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-6"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="mb-16"
           >
-            <h2 className="text-4xl font-bold mb-2">Built for Scale</h2>
-            <p className="text-lg text-white/80">Early access, enterprise-ready.</p>
+            <h2 className="text-[4.5rem] font-medium leading-tight mb-4">
+              <motion.span
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+              >
+                Beta now
+              </motion.span>
+              <br />
+              <motion.span
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+              >
+                Flexible pricing later
+              </motion.span>
+            </h2>
           </motion.div>
 
-          {/* Main Content Container */}
+          {/* Pricing Cards */}
+          <div className="grid grid-cols-2 gap-8 max-w-5xl">
+            {/* Free Tier Card */}
           <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="relative overflow-hidden rounded-3xl mx-auto max-w-sm"
-          >
-            {/* Background Image */}
-            <div className="absolute inset-0">
-              <Image 
-                src="/image12.png" 
-                alt="Background" 
-                fill 
-                className="object-cover brightness-[0.7]"
-                priority 
-              />
-            </div>
-
-            {/* Content */}
-            <div className="relative z-10 p-6">
-              {/* Plans Title */}
-              <motion.h2 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="text-4xl font-bold mb-6"
+              className="relative group"
+            >
+              <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+              <motion.div 
+                whileHover={{ scale: 1.02, y: -8 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="relative rounded-2xl p-8 h-full 
+                transition-all duration-300
+                before:absolute before:inset-0 before:p-[2px] before:rounded-2xl before:content-['']
+                before:bg-[linear-gradient(90deg,rgba(255,255,255,0.3)_0%,rgba(255,255,255,0.9)_50%,rgba(255,255,255,0.3)_100%)]
+                before:bg-[length:200%_100%]
+                before:animate-borderGlow
+                after:absolute after:inset-[2px] after:rounded-2xl after:bg-black
+                group-hover:before:opacity-100 before:opacity-40
+                flex flex-col justify-between z-10"
+                style={{
+                  perspective: '1000px',
+                  transformStyle: 'preserve-3d',
+                }}
               >
-                Plans
-              </motion.h2>
-
-              {/* Plan Switcher */}
-              <div className="bg-black/40 p-1 rounded-lg flex mb-6">
-                <button
-                  onClick={() => setSelectedPlan('free')}
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                    selectedPlan === 'free' 
-                      ? 'bg-black text-white' 
-                      : 'text-white/70 hover:text-white'
-                  }`}
+                <div className="relative z-10">
+                  <motion.h3 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: 0.3 }}
+                    className="text-[2.5rem] font-medium mb-4"
                 >
                   Free Tier
-                </button>
-                <button
-                  onClick={() => setSelectedPlan('pro')}
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                    selectedPlan === 'pro' 
-                      ? 'bg-black text-white' 
-                      : 'text-white/70 hover:text-white'
-                  }`}
-                >
-                  Replin Pro
-                </button>
+                  </motion.h3>
+                  <motion.p 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: 0.4 }}
+                    className="text-xl text-white/80 leading-relaxed"
+                  >
+                    Your Voice Agent,
+                    <br />
+                    On Us
+                  </motion.p>
               </div>
-
-              {/* Plan Details */}
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-                className="bg-black/80 rounded-xl p-6"
-              >
-                <motion.div
-                  key={selectedPlan}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4"
+                <motion.button 
+                  whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.9)" }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  onClick={handleTryDemo}
+                  className="relative z-10 bg-white text-black px-8 py-4 rounded-full text-base font-medium 
+                  transition-colors mt-8 self-start
+                  hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                 >
-                  <h3 className="text-2xl font-bold">
-                    {selectedPlan === 'free' ? 'Free Tier' : 'Replin Pro'}
-                  </h3>
-                  <p className="text-lg text-white/90">
-                    {selectedPlan === 'free' 
-                      ? 'Limited access to get you started'
-                      : 'Unlimited access, premium features, team-ready, priority support.'
-                    }
-                  </p>
-                  <div className="pt-4">
+                  Try Demo
+                </motion.button>
+              </motion.div>
+            </motion.div>
+
+            {/* Pro Tier Card */}
+              <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+              className="relative group"
+              >
+              <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                <motion.div
+                whileHover={{ scale: 1.02, y: -8 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="relative rounded-2xl p-8 h-full 
+                transition-all duration-300
+                before:absolute before:inset-0 before:p-[2px] before:rounded-2xl before:content-['']
+                before:bg-[linear-gradient(90deg,rgba(255,255,255,0.3)_0%,rgba(255,255,255,0.9)_50%,rgba(255,255,255,0.3)_100%)]
+                before:bg-[length:200%_100%]
+                before:animate-borderGlow
+                after:absolute after:inset-[2px] after:rounded-2xl after:bg-black
+                group-hover:before:opacity-100 before:opacity-40
+                flex flex-col justify-between z-10"
+                style={{
+                  perspective: '1000px',
+                  transformStyle: 'preserve-3d',
+                }}
+              >
+                <div className="relative z-10">
+                  <motion.h3 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: 0.5 }}
+                    className="text-[2.5rem] font-medium mb-4"
+                  >
+                    Replin Pro
+                  </motion.h3>
+                  <motion.p 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: 0.6 }}
+                    className="text-xl text-white/80 leading-relaxed"
+                  >
+                    Enterprise-grade
+                    <br />
+                    power. Request
+                    <br />
+                    access to learn more
+                    <br />
+                    & unlock early access
+                  </motion.p>
+                </div>
                     <motion.button
-                      whileHover={{ scale: 1.02 }}
+                  whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.9)" }}
                       whileTap={{ scale: 0.98 }}
-                      className="w-full bg-white text-black py-3 px-6 rounded-lg font-medium text-base"
-                      onClick={() => selectedPlan === 'free' ? handleTryDemo() : handleContactSales()}
-                    >
-                      {selectedPlan === 'free' ? 'Try now' : 'Contact Sales'}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                  onClick={handleContactSales}
+                  className="relative z-10 bg-white text-black px-8 py-4 rounded-full text-base font-medium 
+                  transition-colors mt-8 self-start
+                  hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                >
+                  Contact Sales
                     </motion.button>
-                  </div>
                 </motion.div>
               </motion.div>
             </div>
-          </motion.div>
         </div>
       </section>
     );
@@ -795,159 +966,66 @@ export default function Home() {
     );
   };
 
+  const handleFeatureMouseEnter = () => {
+    if (featureSectionRef.current) {
+      const rect = featureSectionRef.current.getBoundingClientRect();
+      if (rect.top <= 100 && rect.top >= -100) {
+        setIsFeatureSectionHovered(true);
+        document.body.style.overflow = 'hidden';
+      }
+    }
+  };
+
+  const handleFeatureMouseLeave = () => {
+    setIsFeatureSectionHovered(false);
+    document.body.style.overflow = '';
+  };
+
   return (
-    <div className="min-h-screen bg-black text-white py-8 px-8">
+    <div className="min-h-screen bg-black text-white py-8 px-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
       {/* Header/Navigation */}
-      <header className="fixed top-4 left-4 right-4 z-[60]">
-        <nav className="max-w-[1400px] mx-auto bg-black rounded-2xl py-4 px-6">
+      <header className="fixed top-0 left-0 right-0 z-50 py-4">
+        <nav className="container mx-auto px-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
               <Link href="/" className="flex items-center">
-                <Image src="/Logo_image.png" alt="Replin Logo" width={40} height={40} className="mr-2" />
-                <span className="text-white text-xl font-semibold">Replin</span>
+              <Image src="/Logo_image.png" alt="Replin Logo" width={64} height={64} className="mr-4" />
+              <span className="text-white text-2xl font-bold">Replin</span>
               </Link>
-            </div>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-12">
-              <Link href="#manual-support" className="text-base font-medium hover:text-gray-300">
-                Problem
-              </Link>
-              <Link href="#manual-setup" className="text-base font-medium hover:text-gray-300">
+            <div className="hidden md:flex items-center space-x-8">
+              <Link href="#features" className="text-white/70 hover:text-white transition-colors">
                 Features
               </Link>
-              <Link href="#trusted-tech" className="text-base font-medium hover:text-gray-300">
-                Social
-              </Link>
-              <Link href="#beta-now" className="text-base font-medium hover:text-gray-300">
+              <Link href="#pricing" className="text-white/70 hover:text-white transition-colors">
                 Pricing
               </Link>
-              <Link href="#limited-spots" className="text-base font-medium hover:text-gray-300">
+              <Link href="#contact" className="text-white/70 hover:text-white transition-colors">
                 Contact
               </Link>
+              <motion.button
+                whileHover={{ scale: 1.02, y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleSignIn}
+                className="px-4 py-1.5 rounded-full text-sm font-medium
+                          border-2 border-white/30 text-white
+                          hover:bg-white/5 hover:border-white
+                          transition-all duration-300"
+              >
+                Sign In
+              </motion.button>
             </div>
 
-            {/* Desktop Buttons */}
-            <div className="hidden md:flex items-center space-x-4">
-              <Button variant="outline" size="lg" className="bg-black text-white border-white/30 hover:bg-white/10 rounded-md px-6" onClick={handleSignIn}>
-                Sign in
-              </Button>
-              <Button size="lg" className="bg-white text-black hover:bg-white/90 rounded-md px-6" onClick={handleTryDemo}>
-                Try Demo
-              </Button>
-            </div>
-
-            {/* Mobile Hamburger Button */}
+            {/* Mobile Menu Button */}
             <button 
               onClick={toggleMobileMenu}
-              className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors relative z-[70]"
-              aria-label="Toggle menu"
+              className="md:hidden text-white p-2"
             >
-              <motion.div 
-                animate={isMobileMenuOpen ? "open" : "closed"}
-                className="flex flex-col space-y-1.5 w-6"
-              >
-                <motion.span 
-                  variants={{
-                    closed: { rotate: 0, y: 0 },
-                    open: { rotate: 45, y: 8 }
-                  }}
-                  className="w-6 h-0.5 bg-white block"
-                ></motion.span>
-                <motion.span 
-                  variants={{
-                    closed: { opacity: 1 },
-                    open: { opacity: 0 }
-                  }}
-                  className="w-6 h-0.5 bg-white block"
-                ></motion.span>
-                <motion.span 
-                  variants={{
-                    closed: { rotate: 0, y: 0 },
-                    open: { rotate: -45, y: -8 }
-                  }}
-                  className="w-6 h-0.5 bg-white block"
-                ></motion.span>
-              </motion.div>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
             </button>
           </div>
-
-          {/* Mobile Menu */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ 
-              opacity: isMobileMenuOpen ? 1 : 0
-            }}
-            transition={{ duration: 0.3 }}
-            className={`md:hidden fixed inset-0 bg-black/95 backdrop-blur-lg z-40 ${
-              isMobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'
-            }`}
-          >
-            <div className="fixed inset-0 bg-black"></div>
-            <div className="relative z-10 flex flex-col h-full p-6">
-              {/* Menu Items */}
-              <div className="flex-1 flex flex-col justify-center space-y-8">
-                <Link 
-                  href="#manual-support" 
-                  className="text-2xl font-medium hover:text-gray-300 px-4 py-2 rounded-lg hover:bg-white/10 text-center"
-                  onClick={closeMobileMenu}
-                >
-                  Problem
-                </Link>
-                <Link 
-                  href="#manual-setup" 
-                  className="text-2xl font-medium hover:text-gray-300 px-4 py-2 rounded-lg hover:bg-white/10 text-center"
-                  onClick={closeMobileMenu}
-                >
-                  Features
-                </Link>
-                <Link 
-                  href="#trusted-tech" 
-                  className="text-2xl font-medium hover:text-gray-300 px-4 py-2 rounded-lg hover:bg-white/10 text-center"
-                  onClick={closeMobileMenu}
-                >
-                  Social
-                </Link>
-                <Link 
-                  href="#beta-now" 
-                  className="text-2xl font-medium hover:text-gray-300 px-4 py-2 rounded-lg hover:bg-white/10 text-center"
-                  onClick={closeMobileMenu}
-                >
-                  Pricing
-                </Link>
-                <Link 
-                  href="#limited-spots" 
-                  className="text-2xl font-medium hover:text-gray-300 px-4 py-2 rounded-lg hover:bg-white/10 text-center"
-                  onClick={closeMobileMenu}
-                >
-                  Contact
-                </Link>
-              </div>
-
-              {/* Bottom Buttons */}
-              <div className="space-y-4 w-full pt-8 pb-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full bg-black text-white border-white/30 hover:bg-white/10 rounded-xl py-4 text-lg"
-                  onClick={() => {
-                    handleSignIn();
-                    closeMobileMenu();
-                  }}
-                >
-                  Sign in
-                </Button>
-                <Button 
-                  className="w-full bg-white text-black hover:bg-white/90 rounded-xl py-4 text-lg"
-                  onClick={() => {
-                    handleTryDemo();
-                    closeMobileMenu();
-                  }}
-                >
-                  Try Demo
-                </Button>
-              </div>
-            </div>
-          </motion.div>
         </nav>
       </header>
 
@@ -957,888 +1035,976 @@ export default function Home() {
           <MobileHeroSection />
         </div>
       ) : (
-        <section className="relative h-screen mb-48 mt-16 rounded-2xl overflow-hidden">
-          <div className="absolute inset-0">
-            <Image src="/image2.png" alt="Background" fill className="object-cover" priority />
-          </div>
-          <div className="absolute inset-0 flex flex-col justify-start">
-            <div className="max-w-[1400px] mx-auto px-4 md:px-8 w-full h-full pt-16 md:pt-32">
-              <div className="grid grid-cols-1 md:grid-cols-2 h-full relative">
-                <div className="flex flex-col justify-start">
-                  <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8">
+        <section className="relative min-h-[300vh] -mx-8 -mt-8">
+          <div className="sticky top-0 h-screen w-full overflow-hidden">
+            {/* Video Background */}
+            <video 
+              ref={videoRef}
+              className="absolute inset-0 w-full h-full object-cover"
+              src="/video2.mp4"
+              muted
+              playsInline
+              preload="auto"
+            >
+              <source src="/video2.mp4" type="video/mp4" />
+            </video>
+
+            {/* Dynamic Bottom-Up Overlay */}
+            <div 
+              className="absolute inset-0 bg-gradient-to-t from-black via-black/90 to-transparent transition-transform duration-300 z-[2]"
+              style={{ 
+                transform: `translateY(${80 - (scrollProgress * 80)}%)` 
+              }}
+            />
+
+            {/* Content Overlay */}
+            <div className="absolute inset-0 flex flex-col justify-end pb-16 items-center text-white z-[1]">
                     <motion.h1 
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.6 }}
-                      className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-extrabold leading-tight"
-                    >
-                      <span className="whitespace-nowrap">AI Voice</span>
-                      <br />
-                      <span>Agents</span>
+                className="text-5xl md:text-6xl lg:text-7xl leading-none tracking-tight whitespace-nowrap flex items-center justify-center gap-3"
+              >
+                <span className="font-light">Providing</span>
+                <span className="font-bold">AI Voice Agents</span>
+                <span className="font-light">as service</span>
                     </motion.h1>
-                    <motion.div 
-                      initial={{ height: 0 }}
-                      animate={{ height: "11rem" }}
-                      transition={{ duration: 0.8, delay: 0.3 }}
-                      className="hidden md:block w-1.5 bg-white opacity-100" 
-                      style={{ minWidth: '6px' }}
-                    ></motion.div>
-                    <motion.h2 
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.6, delay: 0.6 }}
-                      className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-normal leading-tight"
-                    >
-                      In 3
-                      <br />
-                      Steps
-                    </motion.h2>
-                  </div>
-                </div>
-                <div className="hidden md:flex items-start justify-start -ml-0 sm:-ml-24 md:-ml-48 lg:-ml-72">
-                  <Image
-                    src="/images/hero-person.png"
-                    alt="AI Assistant"
-                    width={1000}
-                    height={1100}
-                    className="object-contain -mt-8 sm:-mt-16 md:-mt-24 lg:-mt-32"
-                  />
-                </div>
-                {/* Mobile Image */}
-                <div className="flex md:hidden items-center justify-center mt-8">
-                  <Image
-                    src="/images/hero-person.png"
-                    alt="AI Assistant"
-                    width={400}
-                    height={440}
-                    className="object-contain"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="absolute bottom-0 left-0 right-0">
-            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-8">
-              <div className="bg-black rounded-t-xl sm:rounded-t-2xl py-8 sm:py-12 px-4 sm:px-8 md:px-10 max-w-5xl mx-auto">
-                <div className="-mt-4">
-                  <motion.h3 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6 }}
-                    className="text-lg sm:text-xl md:text-2xl font-medium text-center mb-4 sm:mb-6"
-                  >
-                    Providing <span className="font-bold">Voice Agents</span> as service
-                  </motion.h3>
-                  <div className="flex flex-col md:flex-row justify-center max-w-2xl mx-auto space-y-4 md:space-y-0">
-                    <div className="relative flex w-full items-center">
-                      <motion.div 
-                        initial={{ width: "0%" }}
-                        animate={{ width: "100%" }}
-                        transition={{ duration: 0.8, delay: 0.3 }}
-                        className="w-full"
-                      >
-                        <Input
-                          type="email"
-                          placeholder="Just enter your email to get a demo"
-                          className="bg-transparent border border-white/30 text-white placeholder:text-white/70 rounded-md h-10 md:h-14 text-sm md:text-base lg:text-lg w-full"
-                        />
-                      </motion.div>
-                      <motion.div 
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.6, delay: 0.8 }}
-                        className="absolute right-2 flex flex-col md:flex-row items-center gap-2"
-                      >
-                        <button className="flex items-center justify-center bg-white hover:bg-white/90 rounded-md h-8 md:h-10 px-3 md:px-4 transition-colors w-full md:w-auto">
-                          <svg viewBox="0 0 24 24" className="w-4 h-4 md:w-5 md:h-5 mr-2" aria-hidden="true">
-                            <path
-                              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                              fill="#4285F4"
-                            />
-                            <path
-                              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                              fill="#34A853"
-                            />
-                            <path
-                              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                              fill="#FBBC05"
-                            />
-                            <path
-                              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                              fill="#EA4335"
-                            />
-                          </svg>
-                          <span className="text-black text-xs md:text-sm font-medium">Google</span>
-                        </button>
-                        <Button className="bg-white text-black hover:bg-white/90 h-16 px-8 rounded-lg text-base font-medium">
-                          Try Demo
-                        </Button>
-                      </motion.div>
-                    </div>
-                  </div>
-                  <motion.p 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.6, delay: 1 }}
-                    className="text-xs md:text-sm text-center text-white/80 max-w-2xl mx-auto mt-4 pb-4"
-                  >
-                    Join 150+ Innovators — Due to high demand, access is limited. Enter your email or sign in with Google to
-                    request your demo.
-                  </motion.p>
-                </div>
-              </div>
             </div>
           </div>
         </section>
       )}
 
-      {/* Problem Section Heading */}
+      {/* Problem Section */}
       {!isMobile && (
+        <section className="relative h-[85vh] bg-black py-18 mt-48">
+          <div className="max-w-[1400px] mx-auto px-8">
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-12 gap-8">
+              {/* Main Text Content - Takes 8 columns */}
+              <div className="col-span-8">
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="w-full flex flex-col items-center mt-12 mb-8"
-        >
-          <h2 className="text-4xl md:text-5xl font-bold text-white text-center mb-4">Help's on Snooze</h2>
-          <h3 className="text-xl sm:text-2xl font-regular text-center mb-4 sm:mb-6">Support feels slow, disconnected, and expensive.</h3>
-        </motion.div>
-      )}
-
-      {/* Conditional Problem Section Rendering */}
-      {isMobile ? (
-        <div className="-mx-8">
-          <MobileProblemSection />
-        </div>
-      ) : (
-        <section id="manual-support" className="relative h-screen mb-48 rounded-2xl overflow-hidden">
-          <div className="absolute inset-0">
-            <Image src="/image2.png" alt="Background" fill className="object-cover" />
-          </div>
-          <div className="absolute inset-0 flex items-center">
-            <div className="max-w-[1400px] mx-auto px-8 w-full">
-              <div className="grid grid-cols-2 gap-16">
-                <div>
-                  <motion.h2 
-                    initial={{ opacity: 0, x: -50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.8 }}
-                    className="text-6xl md:text-7xl lg:text-8xl font-extrabold leading-tight mt-24"
+              className="space-y-8"
                   >
-                    Manual
-                    <br />
-                    support
-                    <br />
-                    kills
-                    <br />
-                    time
-                  </motion.h2>
-                </div>
-                <div className="flex items-center">
-                  <motion.div 
-                    initial={{ height: 0 }}
-                    whileInView={{ height: "600px" }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 1, delay: 0.3 }}
-                    className="w-0.5 bg-white opacity-100 -ml-8 mr-8 self-start mt-8"
-                  ></motion.div>
-                  <div>
-                    <motion.h2 
-                      initial={{ opacity: 0, x: 50 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.8, delay: 0.5 }}
-                      className="text-6xl md:text-7xl lg:text-8xl font-normal leading-tight"
-                    >
-                      AI answers
-                      <br />
-                      instantly
-                    </motion.h2>
-                    <motion.div 
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.6, delay: 0.8 }}
-                      className="bg-black p-6 rounded-lg mb-16 max-w-md mt-12"
-                    >
-                      <p className="text-base">
-                        Manual support is slow, repetitive, and expensive. AI voice agents can handle routine inquiries,
-                        freeing up your team for complex issues.
+                  <h2 className="text-[5rem] leading-none font-bold">
+                    Manual support kills time — AI answers instantly
+              </h2>
+              
+              <p className="text-2xl max-w-3xl text-white/90">
+                Manual support is slow, repetitive, and costly. With Replin 
+                AI's fast and easy agent creation, you get instant, intelligent 
+                responses—anytime.
                       </p>
                     </motion.div>
-                  </div>
-                </div>
               </div>
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: 1 }}
-                className="flex justify-center items-center space-x-8 mt-16"
-              >
-                {/* Existing items with individual animations */}
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 1.2 }}
-                  className="text-center"
-                >
-                  <p className="font-medium text-xl">Delay</p>
-                </motion.div>
-                <motion.div 
-                  initial={{ width: 0 }}
-                  whileInView={{ width: "4rem" }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 1.3 }}
-                  className="h-px bg-white/50"
-                ></motion.div>
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 1.4 }}
-                  className="text-center"
-                >
-                  <p className="font-medium text-xl">Hold Time</p>
-                </motion.div>
-                <motion.div 
-                  initial={{ width: 0 }}
-                  whileInView={{ width: "4rem" }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 1.5 }}
-                  className="h-px bg-white/50"
-                ></motion.div>
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 1.6 }}
-                  className="text-center"
-                >
-                  <p className="font-medium text-xl">Manual Chaos</p>
-                </motion.div>
-                <motion.div 
-                  initial={{ width: 0 }}
-                  whileInView={{ width: "4rem" }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 1.7 }}
-                  className="h-px bg-white/50"
-                ></motion.div>
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 1.8 }}
-                  className="text-center"
-                >
-                  <p className="font-medium text-xl">Slow Support</p>
-                </motion.div>
-                <motion.div 
-                  initial={{ width: 0 }}
-                  whileInView={{ width: "4rem" }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 1.9 }}
-                  className="h-px bg-white/50"
-                ></motion.div>
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 2.0 }}
-                  className="text-center"
-                >
-                  <p className="font-medium text-xl">Overload</p>
-                </motion.div>
-                <motion.div 
-                  initial={{ width: 0 }}
-                  whileInView={{ width: "4rem" }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 2.1 }}
-                  className="h-px bg-white/50"
-                ></motion.div>
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: 2.2 }}
-                  className="text-center"
-                >
-                  <p className="font-medium text-xl">Frustration</p>
-                </motion.div>
-              </motion.div>
-            </div>
-          </div>
-        </section>
-      )}
 
-      {/* Features Section Heading */}
-      {!isMobile && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="w-full flex flex-col items-center mt-12 mb-8"
-        >
-          <h2 className="text-4xl md:text-5xl font-bold text-white text-center mb-4">Smart - Fast - Yours</h2>
-          <h3 className="text-xl sm:text-2xl font-regular text-center mb-4 sm:mb-6">Configure, customize, and deploy — in minutes.</h3>
-        </motion.div>
-      )}
-
-      {/* Conditional Features Section Rendering */}
-      {isMobile ? (
-        <div className="-mx-8">
-          <MobileFeatureSection />
-        </div>
-      ) : (
-        <section id="manual-setup" className="relative h-screen mb-48 rounded-2xl overflow-hidden">
-          <div className="absolute inset-0">
-            <Image src="/image2.png" alt="Background" fill className="object-cover" />
-          </div>
-          <div className="absolute inset-0 flex items-center">
-            <div className="max-w-[1400px] mx-auto px-8 w-full">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <motion.h2 
-                    initial={{ opacity: 0, x: -50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8 }}
-                    className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-tight mt-12"
+              {/* CTA Section - Takes 4 columns */}
+              <div className="col-span-4 flex flex-col justify-center">
+                <motion.div
+                  initial={{ opacity: 0, x: 30 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.2 }}
+                  className="space-y-3"
+                >
+                  {/* Try Demo Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleTryDemo}
+                    className="w-[160px] bg-white text-black py-2 px-4 rounded-full font-medium text-sm
+                    transition-all duration-300 relative group overflow-hidden"
                   >
-                    Manual
-                    <br />
-                    setup is
-                    <br />
-                    complex
-                  </motion.h2>
-                </div>
-                <div className="flex items-center -ml-32">
-                  <motion.div 
-                    initial={{ height: 0 }}
-                    whileInView={{ height: "600px" }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 1, delay: 0.3 }}
-                    className="w-2.5 bg-white opacity-100 -ml-8 mr-8 self-start mt-4"
-                  ></motion.div>
-                  <div>
-                    <motion.h2 
-                      initial={{ opacity: 0, x: 50 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.8, delay: 0.5 }}
-                      className="text-5xl md:text-6xl lg:text-7xl font-normal leading-tight"
-                    >
-                      Replin AI makes it
-                      <br />
-                      effortless and
-                      <br />
-                      instant.
-                    </motion.h2>
-                    <motion.div 
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.6, delay: 0.8 }}
-                      className="grid grid-cols-3 gap-4 mt-12"
-                    >
-                      {/* Feature Cards */}
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.5, delay: 1 }}
-                        className="bg-black p-6 rounded-lg"
-                      >
-                        <h3 className="font-medium text-xl mb-4">From data to agents: Fast</h3>
-                        <p className="text-base text-white/80">
-                          Our platform transforms your documents and data into intelligent voice agents in minutes, not weeks.
-                        </p>
-                      </motion.div>
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.5, delay: 1.2 }}
-                        className="bg-black p-6 rounded-lg"
-                      >
-                        <h3 className="font-medium text-xl mb-4">One prompt, many agents</h3>
-                        <p className="text-base text-white/80">
-                          Create multiple specialized agents from a single prompt, each tailored to different customer needs.
-                        </p>
-                      </motion.div>
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.5, delay: 1.4 }}
-                        className="bg-black p-6 rounded-lg"
-                      >
-                        <h3 className="font-medium text-xl mb-4">No coding, start configuring</h3>
-                        <p className="text-base text-white/80">
-                          Our intuitive interface lets you customize agent behavior without any technical expertise.
-                        </p>
-                      </motion.div>
-                    </motion.div>
-                  </div>
-                </div>
-              </div>
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: 1.6 }}
-                className="flex justify-center items-center space-x-8 mt-16"
-              >
-                <motion.div whileInView={{ opacity: 1 }} initial={{ opacity: 0 }} transition={{ delay: 1.8 }} className="text-center">
-                  <p className="font-medium text-xl">Upload PDF</p>
-                </motion.div>
-                <motion.div initial={{ width: 0 }} whileInView={{ width: "4rem" }} transition={{ duration: 0.3, delay: 1.9 }} className="h-px bg-white/50"></motion.div>
-                <motion.div whileInView={{ opacity: 1 }} initial={{ opacity: 0 }} transition={{ delay: 2.0 }} className="text-center">
-                  <p className="font-medium text-xl">Craft Prompt</p>
-                </motion.div>
-                <motion.div initial={{ width: 0 }} whileInView={{ width: "4rem" }} transition={{ duration: 0.3, delay: 2.1 }} className="h-px bg-white/50"></motion.div>
-                <motion.div whileInView={{ opacity: 1 }} initial={{ opacity: 0 }} transition={{ delay: 2.2 }} className="text-center">
-                  <p className="font-medium text-xl">Go Live</p>
-                </motion.div>
-              </motion.div>
-            </div>
-          </div>
-        </section>
-      )}
+                    <div className="absolute inset-0 bg-white/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <span className="relative z-10">Try Demo</span>
+                  </motion.button>
 
-      {/* Social Section Heading */}
-      {!isMobile && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="w-full flex flex-col items-center mt-12 mb-8"
-        >
-          <h2 className="text-4xl md:text-5xl font-bold text-white text-center mb-4">The Hype Is Building !</h2>
-          <h3 className="text-xl sm:text-2xl font-regular text-center mb-4 sm:mb-6">The momentum is real — join the wave.</h3>
-        </motion.div>
-      )}
-
-      {/* Conditional Social Section Rendering */}
-      {isMobile ? (
-        <div className="-mx-8">
-          <MobileSocialSection />
-        </div>
-      ) : (
-        <section id="trusted-tech" className="relative h-screen mb-48 rounded-2xl overflow-hidden">
-          <div className="absolute inset-0">
-            <Image src="/image2.png" alt="Background" fill className="object-cover" />
-          </div>
-          <div className="absolute inset-0 flex items-center">
-            <div className="max-w-[1400px] mx-auto px-8 w-full">
-              <div className="grid grid-cols-2 gap-16">
-                <div>
-                  <motion.h2 
-                    initial={{ opacity: 0, x: -50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8 }}
-                    className="text-6xl md:text-7xl lg:text-8xl font-extrabold leading-tight mt-24"
+                  {/* Sign In Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSignIn}
+                    className="w-[160px] bg-transparent text-white py-2 px-4 rounded-full font-medium text-sm
+                    border-2 border-white/30 transition-all duration-300
+                    hover:bg-white/5 hover:border-white group overflow-hidden"
                   >
-                    Fueling the
-                    <br />
-                    Future Of
-                    <br />
-                    Fast Support
-                  </motion.h2>
-                </div>
-                <div className="flex items-center">
-                  <motion.div 
-                    initial={{ height: 0 }}
-                    whileInView={{ height: "600px" }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 1, delay: 0.3 }}
-                    className="w-0.5 bg-white opacity-100 -ml-8 mr-8 self-start mt-8"
-                  ></motion.div>
-                  <div>
-                    <motion.h2 
-                      initial={{ opacity: 0, x: 50 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.8, delay: 0.5 }}
-                      className="text-6xl md:text-7xl lg:text-8xl font-normal leading-tight"
-                    >
-                      Built for
-                      <br />
-                      tomorrow.
-                    </motion.h2>
-                    <motion.div 
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.6, delay: 0.8 }}
-                      className="bg-black p-6 rounded-lg mb-16 max-w-md mt-12"
-                    >
-                      <div className="space-y-6">
-                        <div>
-                          <h3 className="font-medium text-xl mb-4">Join the early community shaping next AI</h3>
-                          <p className="text-base text-white/80">
-                            When you join us in the first phase, you help shape the future of voice AI and secure early adopter benefits.
-                          </p>
-                        </div>
-                        
-                        {/* Social Icons */}
-                        <motion.div 
-                          initial={{ opacity: 0, y: 10 }}
-                          whileInView={{ opacity: 1, y: 0 }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 0.4, delay: 1 }}
-                          className="flex justify-center items-center gap-8 pt-4 border-t border-white/10"
-                        >
-                          <motion.a 
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            href="#"
-                            className="text-white/80 hover:text-white transition-colors"
-                          >
-                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-                            </svg>
-                          </motion.a>
-                          <motion.a 
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            href="#"
-                            className="text-white/80 hover:text-white transition-colors"
-                          >
-                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm3.12 18.461h-2.189v-3.425c0-.866-.018-1.982-1.208-1.982-1.21 0-1.396.946-1.396 1.921v3.486H8.13V9.91h2.099v.965h.029c.31-.588 1.07-1.207 2.2-1.207 2.35 0 2.79 1.549 2.79 3.562v4.231zM6.58 8.945c-.712 0-1.29-.578-1.29-1.29 0-.713.578-1.291 1.29-1.291.713 0 1.292.578 1.292 1.29 0 .713-.579 1.291-1.292 1.291zM7.68 18.46H5.484V9.91H7.68v8.55z"/>
-                            </svg>
-                          </motion.a>
-                          <motion.a 
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            href="#"
-                            className="text-white/80 hover:text-white transition-colors"
-                          >
-                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
-                            </svg>
-                          </motion.a>
-                        </motion.div>
-                      </div>
-                    </motion.div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-center items-center space-x-8 mt-16">
-                <div className="text-center">
-                  <p className="font-medium text-xl">Buzz</p>
-                </div>
-                <div className="h-px w-16 bg-white/50"></div>
-                <div className="text-center">
-                  <p className="font-medium text-xl">Momentum</p>
-                </div>
-                <div className="h-px w-16 bg-white/50"></div>
-                <div className="text-center">
-                  <p className="font-medium text-xl">Trust</p>
-                </div>
-                <div className="h-px w-16 bg-white/50"></div>
-                <div className="text-center">
-                  <p className="font-medium text-xl">Hype </p>
-                </div>
-                <div className="h-px w-16 bg-white/50"></div>
-                <div className="text-center">
-                  <p className="font-medium text-xl">Adoption</p>
-                </div>
-                <div className="h-px w-16 bg-white/50"></div>
-                <div className="text-center">
-                  <p className="font-medium text-xl">Community</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+                    <div className="absolute inset-0 bg-white/5 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <span className="relative z-10">Sign In</span>
+                  </motion.button>
 
-      {/* Pricing Section Heading */}
-      {!isMobile && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="w-full flex flex-col items-center mt-12 mb-8"
-        >
-          <h2 className="text-4xl md:text-5xl font-bold text-white text-center mb-4">Built for Scale</h2>
-          <h3 className="text-xl sm:text-2xl font-regular text-center mb-4 sm:mb-6">Early access, enterprise-ready.</h3>
-        </motion.div>
-      )}
-
-      {/* Conditional Pricing Section Rendering */}
-      {isMobile ? (
-        <div className="-mx-8">
-          <MobilePricingSection />
-        </div>
-      ) : (
-        <section id="beta-now" className="relative h-screen mb-48 rounded-2xl overflow-hidden">
-          <div className="absolute inset-0">
-            <Image src="/image2.png" alt="Background" fill className="object-cover" />
-          </div>
-          <div className="absolute inset-0 flex items-center">
-            <div className="max-w-[1400px] mx-auto px-8 w-full">
-              <div className="grid grid-cols-2 gap-16">
-                <div>
-                  <motion.h2 
-                    initial={{ opacity: 0, x: -50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.8 }}
-                    className="text-6xl md:text-7xl lg:text-8xl font-extrabold leading-tight mt-12"
-                  >
-                    Beta
-                    <br />
-                    now
-                  </motion.h2>
-                  <motion.div 
+                  {/* Stats */}
+                  <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: 0.5 }}
-                    className="mt-24"
+                    transition={{ duration: 0.8, delay: 0.4 }}
+                    className="pt-5 space-y-3"
                   >
-                    <motion.div 
-                      initial={{ scale: 0.9 }}
-                      whileInView={{ scale: 1 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.5, delay: 0.8 }}
-                      className="bg-black p-8 rounded-lg"
-                    >
-                      <h3 className="font-medium text-2xl mb-4">Free Tier</h3>
-                      <p className="text-lg text-white/80 mb-8">Limited access to get you started.</p>
-                      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                        <Button size="lg" className="bg-white text-black hover:bg-white/90 rounded-md px-6" onClick={handleTryDemo}>
-                          Try Now
-                        </Button>
-                      </motion.div>
-                    </motion.div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-medium">60% Faster</h4>
+                        <p className="text-sm text-white/60">Response Time</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-medium">150+</h4>
+                        <p className="text-sm text-white/60">Active Users</p>
+                      </div>
+                    </div>
                   </motion.div>
-                </div>
-                <div className="flex items-center">
-                  <motion.div 
-                    initial={{ height: 0 }}
-                    whileInView={{ height: "600px" }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 1, delay: 0.3 }}
-                    className="w-0.5 bg-white opacity-100 -ml-8 mr-8 self-start mt-18"
-                  ></motion.div>
-                  <div>
-                    <motion.h2 
-                      initial={{ opacity: 0, x: 50 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.8, delay: 0.5 }}
-                      className="text-6xl md:text-7xl lg:text-8xl font-normal leading-tight mt-18"
-                    >
-                      Flexible pricing later
-                    </motion.h2>
-                    <motion.div 
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.6, delay: 0.8 }}
-                      className="mt-24"
-                    >
-                      <motion.div 
-                        initial={{ scale: 0.9 }}
-                        whileInView={{ scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.5, delay: 1 }}
-                        className="bg-black p-8 rounded-lg"
-                      >
-                        <h3 className="font-medium text-2xl mb-4">Replin Pro</h3>
-                        <p className="text-lg text-white/80 mb-8">
-                          Unlimited access, premium features, team-ready, priority support.
-                        </p>
-                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                          <Button
-                            variant="outline"
-                            size="lg"
-                            className="bg-black text-white border-white/30 hover:bg-white/10 rounded-md px-6"
-                            onClick={handleContactSales}
-                          >
-                            Contact Sales
-                          </Button>
-                        </motion.div>
-                      </motion.div>
-                    </motion.div>
-                  </div>
+                </motion.div>
+              </div>
+            </div>
+
+            {/* Animated News Strip */}
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  viewport={{ once: true }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="absolute bottom-[20%] left-0 right-0 py-6 border-t border-white/10"
+            >
+              <div className="flex whitespace-nowrap animate-marquee">
+                <div className="flex items-center gap-8 mx-4">
+                  <span className="text-xl">Delay</span>
+                  <div className="w-4 h-px bg-white/30"></div>
+                  <span className="text-xl">Hold Time</span>
+                  <div className="w-4 h-px bg-white/30"></div>
+                  <span className="text-xl">Manual Chaos</span>
+                  <div className="w-4 h-px bg-white/30"></div>
+                  <span className="text-xl">Slow Support</span>
+                  <div className="w-4 h-px bg-white/30"></div>
+                  <span className="text-xl">Overload</span>
+                  <div className="w-4 h-px bg-white/30"></div>
+                  <span className="text-xl">Frustration</span>
+            </div>
+                {/* Duplicate for seamless loop */}
+                <div className="flex items-center gap-8 mx-4">
+                  <span className="text-xl">Delay</span>
+                  <div className="w-4 h-px bg-white/30"></div>
+                  <span className="text-xl">Hold Time</span>
+                  <div className="w-4 h-px bg-white/30"></div>
+                  <span className="text-xl">Manual Chaos</span>
+                  <div className="w-4 h-px bg-white/30"></div>
+                  <span className="text-xl">Slow Support</span>
+                  <div className="w-4 h-px bg-white/30"></div>
+                  <span className="text-xl">Overload</span>
+                  <div className="w-4 h-px bg-white/30"></div>
+                  <span className="text-xl">Frustration</span>
                 </div>
               </div>
+            </motion.div>
+          </div>
+        </section>
+      )}
+
+      {/* Features Section */}
+      {!isMobile && (
+        <section className="relative bg-black min-h-screen py-24 overflow-hidden">
+          <div className="max-w-[1400px] mx-auto px-8">
+          {/* Section Title */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="text-center mb-24"
+            >
+              <motion.h2 
+                initial={{ y: 100, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
+                className="text-[4.5rem] font-medium mb-4"
+              >
+                Smart - Fast - Yours
+              </motion.h2>
+              <motion.p
+                initial={{ y: 50, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, delay: 0.2, type: "spring", stiffness: 100 }}
+                className="text-2xl text-white/70"
+              >
+                Configure, customize, and deploy — in minutes
+              </motion.p>
+            </motion.div>
+
+            {/* Interactive Features Display */}
+            <div className="relative">
+              {/* Central Circular Element */}
+              <motion.div 
+                initial={{ scale: 0.8, opacity: 0 }}
+                whileInView={{ scale: 1, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 1, type: "spring", stiffness: 100 }}
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px]"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-white/5 via-white/10 to-white/5 rounded-full blur-[50px]"></div>
+                <div className="absolute inset-0 border border-white/20 rounded-full"></div>
+                <div className="absolute inset-[2px] border border-white/10 rounded-full"></div>
+              </motion.div>
+
+              {/* Features Container */}
+              <div className="relative grid grid-cols-3 gap-24 items-center">
+                {/* Feature 1 - Left */}
+                  <motion.div 
+                  initial={{ x: -100, opacity: 0 }}
+                  whileInView={{ x: 0, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
+                  className="relative group"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                    <motion.div 
+                    whileHover={{ scale: 1.02, y: -5 }}
+                    className="relative bg-black rounded-3xl p-8 border border-white/10"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <svg className="w-6 h-6 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                      <div>
+                        <h3 className="text-2xl font-medium mb-4">From Docs to Agents—Fast</h3>
+                        <p className="text-white/60 leading-relaxed">
+                          Upload your documents and watch as they transform into intelligent voice agents in minutes. No complex setup required.
+                    </p>
+                  </div>
+                </div>
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      whileInView={{ width: "100%" }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1, delay: 0.5 }}
+                      className="h-[1px] bg-gradient-to-r from-white/40 to-transparent mt-6"
+                    ></motion.div>
+                  </motion.div>
+                </motion.div>
+
+                {/* Feature 2 - Center */}
+                <motion.div
+                  initial={{ y: 100, opacity: 0 }}
+                  whileInView={{ y: 0, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.2, type: "spring", stiffness: 100 }}
+                  className="relative group"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                  <motion.div 
+                    whileHover={{ scale: 1.02, y: -5 }}
+                    className="relative bg-black rounded-3xl p-8 border border-white/10"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <svg className="w-6 h-6 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                      <div>
+                        <h3 className="text-2xl font-medium mb-4">One prompt. Agent live.</h3>
+                        <p className="text-white/60 leading-relaxed">
+                          Define your agent's personality and behavior with a single prompt. Watch it come to life instantly.
+                    </p>
+                  </div>
+                </div>
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      whileInView={{ width: "100%" }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1, delay: 0.7 }}
+                      className="h-[1px] bg-gradient-to-r from-white/40 to-transparent mt-6"
+                    ></motion.div>
+                  </motion.div>
+                </motion.div>
+
+                {/* Feature 3 - Right */}
+                <motion.div
+                  initial={{ x: 100, opacity: 0 }}
+                  whileInView={{ x: 0, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.4, type: "spring", stiffness: 100 }}
+                  className="relative group"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-l from-white/5 to-transparent rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                  <motion.div 
+                    whileHover={{ scale: 1.02, y: -5 }}
+                    className="relative bg-black rounded-3xl p-8 border border-white/10"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <svg className="w-6 h-6 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                  </div>
+                      <div>
+                        <h3 className="text-2xl font-medium mb-4">Skip coding. Start Configuring</h3>
+                        <p className="text-white/60 leading-relaxed">
+                          No coding needed. Just configure your agent's settings through our intuitive interface and go live.
+                    </p>
+              </div>
+                </div>
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      whileInView={{ width: "100%" }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 1, delay: 0.9 }}
+                      className="h-[1px] bg-gradient-to-r from-white/40 to-transparent mt-6"
+                    ></motion.div>
+                </motion.div>
+                </motion.div>
+              </div>
+
+              {/* Interactive Elements */}
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Animated Lines */}
+                <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                  <motion.path
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    whileInView={{ pathLength: 1, opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.5, delay: 1 }}
+                    d="M200 300 L600 300"
+                    stroke="rgba(255,255,255,0.1)"
+                    strokeWidth="1"
+                    fill="none"
+                  />
+                  <motion.path
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    whileInView={{ pathLength: 1, opacity: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1.5, delay: 1.2 }}
+                    d="M600 300 L1000 300"
+                    stroke="rgba(255,255,255,0.1)"
+                    strokeWidth="1"
+                    fill="none"
+                  />
+                </svg>
+              </div>
+
+              {/* Bottom Stats */}
+              <motion.div 
+                initial={{ y: 50, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, delay: 1.4 }}
+                className="mt-24 grid grid-cols-3 gap-8"
+              >
+                <div className="text-center">
+                  <h4 className="text-3xl font-bold mb-2">3 Steps</h4>
+                  <p className="text-white/60">To Go Live</p>
+                </div>
+                <div className="text-center">
+                  <h4 className="text-3xl font-bold mb-2">1 Minute</h4>
+                  <p className="text-white/60">Setup Time</p>
+                </div>
+                <div className="text-center">
+                  <h4 className="text-3xl font-bold mb-2">24/7</h4>
+                  <p className="text-white/60">Always Available</p>
+                </div>
+              </motion.div>
             </div>
           </div>
         </section>
       )}
 
-      {/* Contact Section Heading */}
+      {/* Social Section */}
       {!isMobile && (
+        <section className="relative bg-black min-h-screen py-24 overflow-hidden">
+          <div className="max-w-[1400px] mx-auto px-8">
+            {/* Section Title */}
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="w-full flex flex-col items-center mt-12 mb-8"
-        >
-          <h2 className="text-4xl md:text-5xl font-bold text-white text-center mb-4">Let's Talk AI</h2>
-          <h3 className="text-xl sm:text-2xl font-regular text-center mb-4 sm:mb-6">Support feels slow, disconnected, and expensive.</h3>
-        </motion.div>
-      )}
-
-      {/* Conditional Contact Section Rendering */}
-      {isMobile ? (
-        <div className="-mx-8">
-          <MobileContactSection />
-        </div>
-      ) : (
-        <section id="limited-spots" className="relative h-screen mb-24 rounded-2xl overflow-hidden">
-          <div className="absolute inset-0">
-            <Image src="/image2.png" alt="Background" fill className="object-cover" />
-          </div>
-          <div className="absolute inset-0 flex flex-col justify-start pt-32">
-            <div className="max-w-[1400px] mx-auto px-8 w-full">
-              <div className="grid grid-cols-2 gap-16">
-                <div>
+              transition={{ duration: 0.8 }}
+              className="text-center mb-24"
+            >
                   <motion.h2 
-                    initial={{ opacity: 0, x: -50 }}
-                    whileInView={{ opacity: 1, x: 0 }}
+                initial={{ y: 100, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.8 }}
-                    className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-tight"
-                  >
-                    Limited
-                  <br />
-                  spots
-                  <br />
-                  available
-                </motion.h2>
+                transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
+                className="text-[4.5rem] font-medium mb-4"
+              >
+                The Hype Is Building!
+                  </motion.h2>
+              <motion.p
+                initial={{ y: 50, opacity: 0 }}
+                whileInView={{ y: 0, opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, delay: 0.2, type: "spring", stiffness: 100 }}
+                className="text-2xl text-white/70"
+              >
+                Join the wave of innovation
+              </motion.p>
+            </motion.div>
+
+            {/* Main Content */}
+            <div className="relative">
+              {/* Circular Glow Background */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px]">
+                <div className="absolute inset-0 bg-gradient-to-r from-white/5 via-white/10 to-white/5 rounded-full blur-[100px]"></div>
                 </div>
-                <div className="flex items-start">
+
+              {/* Content Grid */}
+              <div className="grid grid-cols-3 gap-8 relative">
+                {/* Left Column - Community Stats */}
                   <motion.div 
-                    initial={{ height: 0 }}
-                    whileInView={{ height: "300px" }}
+                  initial={{ x: -100, opacity: 0 }}
+                  whileInView={{ x: 0, opacity: 1 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 1, delay: 0.3 }}
-                    className="w-0.5 bg-white opacity-100 -ml-8 mr-8"
-                  ></motion.div>
-                  <div>
-                    <motion.h2 
-                      initial={{ opacity: 0, x: 50 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ duration: 0.8, delay: 0.5 }}
-                      className="text-5xl md:text-6xl lg:text-7xl font-normal leading-tight"
+                  transition={{ duration: 0.8, type: "spring", stiffness: 100 }}
+                  className="space-y-8"
+                >
+                  <div className="relative group cursor-pointer">
+                    <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                    <motion.div 
+                      whileHover={{ scale: 1.02, y: -5 }}
+                      className="relative bg-white/5 rounded-2xl p-6 border border-white/10 backdrop-blur-sm"
                     >
-                      Be among the
-                      <br />
-                      first to experience
-                      <br />
-                      Replin AI
-                    </motion.h2>
+                      <h3 className="text-4xl font-bold mb-2">150+</h3>
+                      <p className="text-white/60">Active Beta Users</p>
+                    </motion.div>
+                        </div>
+                  <div className="relative group cursor-pointer">
+                    <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                    <motion.div 
+                      whileHover={{ scale: 1.02, y: -5 }}
+                      className="relative bg-white/5 rounded-2xl p-6 border border-white/10 backdrop-blur-sm"
+                    >
+                      <h3 className="text-4xl font-bold mb-2">10k+</h3>
+                      <p className="text-white/60">Waitlist Members</p>
+                    </motion.div>
+                  </div>
+                </motion.div>
+
+                {/* Center Column - Social Links */}
+                        <motion.div 
+                  initial={{ y: 100, opacity: 0 }}
+                  whileInView={{ y: 0, opacity: 1 }}
+                          viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.2, type: "spring", stiffness: 100 }}
+                  className="relative"
+                        >
+                  <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent rounded-3xl blur-xl"></div>
+                  <div className="relative bg-white/5 rounded-3xl p-8 border border-white/10 backdrop-blur-sm">
+                    <h3 className="text-2xl font-medium mb-8">Connect With Us</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                          <motion.a 
+                        href="#twitter"
+                        whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex items-center gap-3 p-4 rounded-xl hover:bg-white/5 transition-all duration-300"
+                      >
+                        <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+                            </svg>
+                        </div>
+                        <span>Twitter</span>
+                          </motion.a>
+                          <motion.a 
+                        href="#linkedin"
+                        whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex items-center gap-3 p-4 rounded-xl hover:bg-white/5 transition-all duration-300"
+                      >
+                        <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm3.12 18.461h-2.189v-3.425c0-.866-.018-1.982-1.208-1.982-1.21 0-1.396.946-1.396 1.921v3.486H8.13V9.91h2.099v.965h.029c.31-.588 1.07-1.207 2.2-1.207 2.35 0 2.79 1.549 2.79 3.562v4.231zM6.58 8.945c-.712 0-1.29-.578-1.29-1.29 0-.713.578-1.291 1.29-1.291.713 0 1.292.578 1.292 1.29 0 .713-.579 1.291-1.292 1.291zM7.68 18.46H5.484V9.91H7.68v8.55z"/>
+                            </svg>
+                        </div>
+                        <span>LinkedIn</span>
+                          </motion.a>
+                          <motion.a 
+                        href="#discord"
+                        whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex items-center gap-3 p-4 rounded-xl hover:bg-white/5 transition-all duration-300"
+                      >
+                        <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                            </svg>
+                        </div>
+                        <span>Discord</span>
+                          </motion.a>
+                      <motion.a
+                        href="#github"
+                        whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex items-center gap-3 p-4 rounded-xl hover:bg-white/5 transition-all duration-300"
+                      >
+                        <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+                          </svg>
+                      </div>
+                        <span>GitHub</span>
+                      </motion.a>
                   </div>
                 </div>
+                </motion.div>
+
+                {/* Right Column - Community Highlights */}
+                <motion.div
+                  initial={{ x: 100, opacity: 0 }}
+                  whileInView={{ x: 0, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.4, type: "spring", stiffness: 100 }}
+                  className="space-y-8"
+                >
+                  <div className="relative group cursor-pointer">
+                    <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                    <motion.div 
+                      whileHover={{ scale: 1.02, y: -5 }}
+                      className="relative bg-white/5 rounded-2xl p-6 border border-white/10 backdrop-blur-sm"
+                    >
+                      <h3 className="text-4xl font-bold mb-2">24/7</h3>
+                      <p className="text-white/60">Community Support</p>
+                    </motion.div>
               </div>
+                  <div className="relative group cursor-pointer">
+                    <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                    <motion.div 
+                      whileHover={{ scale: 1.02, y: -5 }}
+                      className="relative bg-white/5 rounded-2xl p-6 border border-white/10 backdrop-blur-sm"
+                    >
+                      <h3 className="text-4xl font-bold mb-2">95%</h3>
+                      <p className="text-white/60">User Satisfaction</p>
+                    </motion.div>
+                </div>
+                </motion.div>
+                </div>
+
+              {/* Bottom Marquee */}
               <motion.div 
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, delay: 0.6 }}
+                className="mt-24 overflow-hidden py-8 border-t border-white/10"
+              >
+                <div className="flex whitespace-nowrap animate-marquee">
+                  <div className="flex items-center gap-12 mx-4">
+                    <span className="text-xl text-white/60">Innovation</span>
+                    <div className="w-3 h-3 rounded-full bg-white/20"></div>
+                    <span className="text-xl text-white/60">Community</span>
+                    <div className="w-3 h-3 rounded-full bg-white/20"></div>
+                    <span className="text-xl text-white/60">Growth</span>
+                    <div className="w-3 h-3 rounded-full bg-white/20"></div>
+                    <span className="text-xl text-white/60">Support</span>
+                    <div className="w-3 h-3 rounded-full bg-white/20"></div>
+                    <span className="text-xl text-white/60">Future</span>
+                </div>
+                  {/* Duplicate for seamless loop */}
+                  <div className="flex items-center gap-12 mx-4">
+                    <span className="text-xl text-white/60">Innovation</span>
+                    <div className="w-3 h-3 rounded-full bg-white/20"></div>
+                    <span className="text-xl text-white/60">Community</span>
+                    <div className="w-3 h-3 rounded-full bg-white/20"></div>
+                    <span className="text-xl text-white/60">Growth</span>
+                    <div className="w-3 h-3 rounded-full bg-white/20"></div>
+                    <span className="text-xl text-white/60">Support</span>
+                    <div className="w-3 h-3 rounded-full bg-white/20"></div>
+                    <span className="text-xl text-white/60">Future</span>
+                </div>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Pricing Section */}
+      {!isMobile && (
+        <section className="relative bg-black min-h-screen py-24">
+          <div className="max-w-[1400px] mx-auto px-8">
+            {/* Section Title */}
+        <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="mb-16"
+            >
+              <h2 className="text-[4.5rem] font-medium leading-tight mb-4">
+                <motion.span
+                  initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: 0.2 }}
+                  >
+                  Beta now
+                </motion.span>
+                    <br />
+                <motion.span
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: 0.4 }}
+                >
+                  Flexible pricing later
+                </motion.span>
+              </h2>
+            </motion.div>
+
+            {/* Pricing Cards */}
+            <div className="grid grid-cols-2 gap-8 max-w-5xl">
+              {/* Free Tier Card */}
+                  <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="relative group"
+                  >
+                <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                    <motion.div 
+                  whileHover={{ scale: 1.02, y: -8 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  className="relative rounded-2xl p-8 h-full 
+                  transition-all duration-300
+                  before:absolute before:inset-0 before:p-[2px] before:rounded-2xl before:content-['']
+                  before:bg-[linear-gradient(90deg,rgba(255,255,255,0.3)_0%,rgba(255,255,255,0.9)_50%,rgba(255,255,255,0.3)_100%)]
+                  before:bg-[length:200%_100%]
+                  before:animate-borderGlow
+                  after:absolute after:inset-[2px] after:rounded-2xl after:bg-black
+                  group-hover:before:opacity-100 before:opacity-40
+                  flex flex-col justify-between z-10"
+                  style={{
+                    perspective: '1000px',
+                    transformStyle: 'preserve-3d',
+                  }}
+                >
+                  <div className="relative z-10">
+                    <motion.h3 
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: 0.3 }}
+                      className="text-[2.5rem] font-medium mb-4"
+                    >
+                      Free Tier
+                    </motion.h3>
+                    <motion.p 
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: 0.4 }}
+                      className="text-xl text-white/80 leading-relaxed"
+                    >
+                      Your Voice Agent,
+                      <br />
+                      On Us
+                    </motion.p>
+                  </div>
+                  <motion.button 
+                    whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.9)" }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    onClick={handleTryDemo}
+                    className="relative z-10 bg-white text-black px-8 py-4 rounded-full text-base font-medium 
+                    transition-colors mt-8 self-start
+                    hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                  >
+                    Try Demo
+                  </motion.button>
+                      </motion.div>
+                    </motion.div>
+
+              {/* Pro Tier Card */}
+                  <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="relative group"
+              >
+                <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                    <motion.div 
+                  whileHover={{ scale: 1.02, y: -8 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  className="relative rounded-2xl p-8 h-full 
+                  transition-all duration-300
+                  before:absolute before:inset-0 before:p-[2px] before:rounded-2xl before:content-['']
+                  before:bg-[linear-gradient(90deg,rgba(255,255,255,0.3)_0%,rgba(255,255,255,0.9)_50%,rgba(255,255,255,0.3)_100%)]
+                  before:bg-[length:200%_100%]
+                  before:animate-borderGlow
+                  after:absolute after:inset-[2px] after:rounded-2xl after:bg-black
+                  group-hover:before:opacity-100 before:opacity-40
+                  flex flex-col justify-between z-10"
+                  style={{
+                    perspective: '1000px',
+                    transformStyle: 'preserve-3d',
+                  }}
+                >
+                  <div className="relative z-10">
+                    <motion.h3 
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: 0.5 }}
+                      className="text-[2.5rem] font-medium mb-4"
+                    >
+                      Replin Pro
+                    </motion.h3>
+                    <motion.p 
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: 0.6 }}
+                      className="text-xl text-white/80 leading-relaxed"
+                    >
+                      Enterprise-grade
+                      <br />
+                      power. Request
+                      <br />
+                      access to learn more
+                      <br />
+                      & unlock early access
+                    </motion.p>
+                  </div>
+                  <motion.button 
+                    whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.9)" }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                            onClick={handleContactSales}
+                    className="relative z-10 bg-white text-black px-8 py-4 rounded-full text-base font-medium 
+                    transition-colors mt-8 self-start
+                    hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                          >
+                            Contact Sales
+                  </motion.button>
+                      </motion.div>
+                    </motion.div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Contact Section */}
+      {!isMobile && (
+        <section className="relative bg-black min-h-screen py-24">
+          <div className="max-w-[1400px] mx-auto px-8">
+            {/* Section Title */}
+        <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="mb-16"
+            >
+              <h2 className="text-[4.5rem] font-medium leading-tight mb-4">
+                <motion.span
+                  initial={{ opacity: 0, x: -20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: 0.2 }}
+                  >
+                  Let's Talk AI
+                </motion.span>
+                  <br />
+                <motion.span
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6, delay: 0.4 }}
+                  className="text-white/70"
+                >
+                  Join the future of voice
+                </motion.span>
+              </h2>
+            </motion.div>
+
+            {/* Contact Cards Grid */}
+            <div className="grid grid-cols-2 gap-8 max-w-5xl">
+              {/* Demo Request Card */}
+                  <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="relative group"
+              >
+                <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                <motion.div 
+                  whileHover={{ scale: 1.02, y: -8 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  className="relative rounded-2xl p-8 h-full 
+                            transition-all duration-300
+                            before:absolute before:inset-0 before:p-[2px] before:rounded-2xl before:content-['']
+                            before:bg-[linear-gradient(90deg,rgba(255,255,255,0.3)_0%,rgba(255,255,255,0.9)_50%,rgba(255,255,255,0.3)_100%)]
+                            before:bg-[length:200%_100%]
+                            before:animate-borderGlow
+                            after:absolute after:inset-[2px] after:rounded-2xl after:bg-black
+                            group-hover:before:opacity-100 before:opacity-40
+                            flex flex-col justify-between z-10"
+                  style={{
+                    perspective: '1000px',
+                    transformStyle: 'preserve-3d',
+                  }}
+                >
+                  <div className="relative z-10">
+                    <motion.h3 
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: 0.3 }}
+                      className="text-[2.5rem] font-medium mb-6"
+                    >
+                      Limited spots
+                      <br />
+                      available
+                    </motion.h3>
+                    <motion.p 
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: 0.8 }}
-                className="mt-16 max-w-[1400px] mx-auto"
+                      transition={{ duration: 0.4, delay: 0.4 }}
+                      className="text-xl text-white/80 leading-relaxed mb-8"
               >
-                <div className="relative flex items-center gap-4">
+                      Be among the first to experience
+                      <br />
+                      Replin AI's voice revolution
+                    </motion.p>
                   <motion.div 
-                    initial={{ width: "0%" }}
-                    whileInView={{ width: "calc(50% - 2rem)" }}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
-                    transition={{ duration: 0.8, delay: 1 }}
-                    className="w-[calc(50%-2rem)]"
+                      transition={{ duration: 0.4, delay: 0.5 }}
+                      className="space-y-4"
                   >
-                    <Input
+                      <div className="relative">
+                        <input
                       type="email"
-                      placeholder="Just enter your email to get a demo"
-                      className="bg-black/80 border border-white/30 text-white placeholder:text-gray-400 rounded-lg h-16 text-lg w-full"
-                    />
-                  </motion.div>
-                  <motion.div 
-                    initial={{ opacity: 0, x: 20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.6, delay: 1.2 }}
-                    className="flex items-center gap-4"
-                  >
+                          placeholder="Enter your email for demo access"
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-6 py-4 text-white placeholder:text-white/40
+                                   focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all duration-300"
+                        />
+                      </div>
                     <motion.button 
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="flex items-center justify-center bg-white hover:bg-white/90 rounded-lg h-16 px-6 transition-colors"
-                    >
-                      <svg viewBox="0 0 24 24" className="w-6 h-6 mr-2" aria-hidden="true">
-                        <path
-                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                          fill="#4285F4"
-                        />
-                        <path
-                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                          fill="#34A853"
-                        />
-                        <path
-                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                          fill="#FBBC05"
-                        />
-                        <path
-                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                          fill="#EA4335"
-                        />
-                      </svg>
-                      <span className="text-black text-base font-medium">Google</span>
+                        whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.9)" }}
+                        whileTap={{ scale: 0.98 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                        onClick={handleTryDemo}
+                        className="w-full bg-white text-black px-8 py-4 rounded-xl text-base font-medium 
+                                 transition-colors hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                      >
+                        Request Demo Access
                     </motion.button>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button className="bg-white text-black hover:bg-white/90 h-16 px-8 rounded-lg text-base font-medium">
-                        Try Demo
-                      </Button>
-                    </motion.div>
                   </motion.div>
                 </div>
-                <motion.p 
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 1.4 }}
-                  className="text-sm text-white/80 text-left mt-4"
-                >
-                  Join 150+ Innovators — Due to high demand, access is limited. Enter your email or sign in with Google to request your demo.
-                </motion.p>
+                </motion.div>
               </motion.div>
 
-              {/* Contact Sales Section */}
+              {/* Enterprise Contact Card */}
+              <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+                className="relative group"
+              >
+                <div className="absolute inset-0 bg-white/10 rounded-2xl blur-md opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+                <motion.div 
+                  whileHover={{ scale: 1.02, y: -8 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  className="relative rounded-2xl p-8 h-full 
+                            transition-all duration-300
+                            before:absolute before:inset-0 before:p-[2px] before:rounded-2xl before:content-['']
+                            before:bg-[linear-gradient(90deg,rgba(255,255,255,0.3)_0%,rgba(255,255,255,0.9)_50%,rgba(255,255,255,0.3)_100%)]
+                            before:bg-[length:200%_100%]
+                            before:animate-borderGlow
+                            after:absolute after:inset-[2px] after:rounded-2xl after:bg-black
+                            group-hover:before:opacity-100 before:opacity-40
+                            flex flex-col justify-between z-10"
+                  style={{
+                    perspective: '1000px',
+                    transformStyle: 'preserve-3d',
+                  }}
+                >
+                  <div className="relative z-10">
+                    <motion.h3 
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: 0.5 }}
+                      className="text-[2.5rem] font-medium mb-6"
+                    >
+                      Enterprise
+                      <br />
+                      Solutions
+                    </motion.h3>
+                <motion.p 
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: 0.6 }}
+                      className="text-xl text-white/80 leading-relaxed"
+                    >
+                      Looking for a custom solution?
+                      <br />
+                      Our enterprise team is here to help
+                      <br />
+                      build the perfect voice AI for
+                      <br />
+                      your business needs.
+                </motion.p>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: 1.6 }}
-                className="absolute bottom-6 right-6 bg-black/80 backdrop-blur-sm rounded-lg p-4 max-w-[320px]"
-              >
-                <div className="space-y-2">
-                  <p className="text-sm text-white/90">
-                    For enterprise plan queries, reach out to our sales team
-                  </p>
+                      transition={{ duration: 0.4, delay: 0.7 }}
+                      className="mt-8 space-y-6"
+                    >
+                      <div className="flex items-center gap-4 text-white/60">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                        </svg>
+                        <span>Custom AI Model Training</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-white/60">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                        </svg>
+                        <span>Dedicated Support Team</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-white/60">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                        </svg>
+                        <span>API Integration Support</span>
+                      </div>
                   <motion.button
-                    whileHover={{ scale: 1.02 }}
+                        whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.9)" }}
                     whileTap={{ scale: 0.98 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 17 }}
                     onClick={handleContactSales}
-                    className="bg-black text-white border border-white/20 py-2 px-4 rounded-md text-sm hover:bg-white/10 transition-colors w-full"
+                        className="w-full bg-white text-black px-8 py-4 rounded-xl text-base font-medium 
+                                 transition-colors hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] mt-8"
                   >
-                    Contact Sales
+                        Contact Enterprise Team
                   </motion.button>
+                    </motion.div>
                 </div>
+                </motion.div>
               </motion.div>
             </div>
           </div>

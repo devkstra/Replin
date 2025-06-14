@@ -80,31 +80,57 @@ body {
   color: white;
 }
 
-/* Custom scrollbar */
+/* Invisible but functional scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 0;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-track {
-  background: #000;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 4px;
+  background: transparent;
+  border: none;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
+/* For Firefox */
+* {
+  scrollbar-width: none;
 }
 
-/* Smooth scrolling */
+/* For Edge */
+*::-ms-scrollbar {
+  display: none;
+}
+
+/* Maintain smooth scrolling */
 html {
   scroll-behavior: smooth;
+  overflow-y: scroll; /* Keep scrolling functionality */
 }
 
 /* Rounded corners for sections */
 section > div:first-child {
   border-radius: 16px;
   overflow: hidden;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 20s linear infinite;
+}
+
+@keyframes borderGlow {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
 }
