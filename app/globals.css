@@ -111,12 +111,6 @@ html {
   overflow-y: scroll; /* Keep scrolling functionality */
 }
 
-/* Rounded corners for sections */
-section > div:first-child {
-  border-radius: 16px;
-  overflow: hidden;
-}
-
 @keyframes marquee {
   0% {
     transform: translateX(0);
