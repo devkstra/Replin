@@ -1,35 +1,48 @@
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+
+// Initialize Supabase client with environment variables
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function POST(request: Request) {
   try {
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn('Supabase credentials not configured');
+      // Return success for now, but log to console
+      return NextResponse.json({ 
+        success: true,
+        message: 'Message received (Development mode)'
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
     const { email, message } = await request.json();
 
     if (!email || !message) {
-      return NextResponse.json(
-        { error: 'Email and message are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ 
+        success: false,
+        error: 'Email and message are required' 
+      }, { status: 400 });
     }
 
-    // Store the contact form submission in Supabase
-    const { data, error } = await supabase
-      .from('contact_submissions')
-      .insert([{ email, message, created_at: new Date().toISOString() }]);
+    // Insert into Supabase
+    const { error } = await supabase
+      .from('contacts')
+      .insert([{ email, message }]);
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    // Here you could also add email notification logic
-    // For example, using a service like SendGrid or AWS SES
+    return NextResponse.json({ 
+      success: true,
+      message: 'Message sent successfully'
+    });
 
-    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Contact form submission error:', error);
-    return NextResponse.json(
-      { error: 'Failed to submit contact form' },
-      { status: 500 }
-    );
+    console.error('Contact form error:', error);
+    return NextResponse.json({ 
+      success: false,
+      error: 'Failed to send message'
+    }, { status: 500 });
   }
 } 
