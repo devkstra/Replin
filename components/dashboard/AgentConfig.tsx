@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { configureAgent } from "@/utils/api";
 import { AgentConfigFormData, UserIdProps } from '@/types';
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, ArrowRight, CheckCircle2, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AgentConfigProps extends UserIdProps {
   onNavigateTab?: (tab: string) => void;
@@ -133,8 +134,10 @@ export default function AgentConfig({ userId, onNavigateTab }: AgentConfigProps)
               {result.success && onNavigateTab && (
                 <Button
                   onClick={() => onNavigateTab('control')}
-                  className="shrink-0"
-                  size="sm"
+                  className={cn(
+                    buttonVariants({ variant: "default", size: "sm" }),
+                    "shrink-0"
+                  )}
                 >
                   Control Agent
                   <ArrowRight className="ml-2 h-4 w-4" />

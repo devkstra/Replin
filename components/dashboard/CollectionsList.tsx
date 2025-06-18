@@ -6,7 +6,8 @@ import { Collection, UserIdProps } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, FolderIcon } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeProps } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function CollectionsList({ userId }: UserIdProps) {
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -92,7 +93,7 @@ export default function CollectionsList({ userId }: UserIdProps) {
                   </div>
                 </div>
                 {collection.is_default && (
-                  <Badge variant="secondary">Default</Badge>
+                  <Badge variant="secondary" className="bg-secondary/50">Default</Badge>
                 )}
               </div>
             </div>

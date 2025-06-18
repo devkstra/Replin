@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { startAgent, stopAgent, listAgents, listCollections, testStartAgent } from "@/utils/api";
 import { Collection, AgentControlFormData, UserIdProps } from '@/types';
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, AlertTriangle, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 export default function AgentControl({ userId }: UserIdProps) {
   const { register, handleSubmit, formState: { isSubmitting }, watch, setValue } = useForm<AgentControlFormData>({
@@ -213,10 +214,12 @@ export default function AgentControl({ userId }: UserIdProps) {
               </AlertDescription>
             </Alert>
             <Button
-              variant="destructive"
+              className={cn(
+                buttonVariants({ variant: "destructive" }),
+                "w-full"
+              )}
               onClick={onStopAgent}
               disabled={isSubmitting}
-              className="w-full"
             >
               {isSubmitting ? (
                 <>
@@ -251,9 +254,10 @@ export default function AgentControl({ userId }: UserIdProps) {
                     <ExternalLink className="h-4 w-4" />
                   </a>
                   <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-6 w-6"
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "icon" }),
+                      "h-6 w-6"
+                    )}
                     onClick={() => {
                       navigator.clipboard.writeText('https://front-six-gules.vercel.app/voice-chat');
                       toast.success('Link copied to clipboard!');
@@ -279,7 +283,10 @@ export default function AgentControl({ userId }: UserIdProps) {
         )}
 
         <Button
-          variant="outline"
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "w-full mt-4"
+          )}
           onClick={async () => {
             try {
               setResult({ loading: true, message: "Testing API..." });
@@ -295,7 +302,6 @@ export default function AgentControl({ userId }: UserIdProps) {
               });
             }
           }}
-          className="w-full mt-4"
         >
           <AlertTriangle className="mr-2 h-4 w-4" />
           Test API (Debug)
