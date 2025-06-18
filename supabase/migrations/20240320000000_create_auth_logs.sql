@@ -58,18 +58,18 @@ DECLARE
 BEGIN
   -- Determine event type and details
   _event_type := CASE 
-    WHEN TG_OP = 'INSERT' THEN 'SIGN_UP'
-    WHEN TG_OP = 'DELETE' THEN 'DELETE_ACCOUNT'
-    WHEN NEW.last_sign_in_at IS DISTINCT FROM OLD.last_sign_in_at THEN 'SIGN_IN'
-    ELSE 'UPDATE'
+        WHEN TG_OP = 'INSERT' THEN 'SIGN_UP'
+        WHEN TG_OP = 'DELETE' THEN 'DELETE_ACCOUNT'
+        WHEN NEW.last_sign_in_at IS DISTINCT FROM OLD.last_sign_in_at THEN 'SIGN_IN'
+        ELSE 'UPDATE'
   END;
 
   _details := CASE 
-    WHEN TG_OP = 'INSERT' THEN 'Method: ' || COALESCE(NEW.raw_app_meta_data->>'provider', 'email')
-    WHEN TG_OP = 'DELETE' THEN 'Account deleted'
-    WHEN NEW.last_sign_in_at IS DISTINCT FROM OLD.last_sign_in_at 
-      THEN 'Method: ' || COALESCE(NEW.raw_app_meta_data->>'provider', 'email')
-    ELSE 'Profile updated'
+        WHEN TG_OP = 'INSERT' THEN 'Method: ' || COALESCE(NEW.raw_app_meta_data->>'provider', 'email')
+        WHEN TG_OP = 'DELETE' THEN 'Account deleted'
+        WHEN NEW.last_sign_in_at IS DISTINCT FROM OLD.last_sign_in_at 
+          THEN 'Method: ' || COALESCE(NEW.raw_app_meta_data->>'provider', 'email')
+        ELSE 'Profile updated'
   END;
 
   -- Insert basic auth log
@@ -87,16 +87,16 @@ BEGIN
     END,
     _event_type,
     _details,
-    true
-  );
-
+      true
+    );
+  
   -- Always return the NEW record to allow the auth operation to proceed
   RETURN COALESCE(NEW, OLD);
 EXCEPTION 
   WHEN OTHERS THEN
     -- Log error but don't block the auth operation
     RAISE WARNING 'Failed to log auth event: %', SQLERRM;
-    RETURN COALESCE(NEW, OLD);
+  RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

@@ -17,7 +17,8 @@ const documentApi = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-  }
+  },
+  timeout: 30000 // 30 second timeout
 });
 
 const agentManagerApi = axios.create({
@@ -25,7 +26,8 @@ const agentManagerApi = axios.create({
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-  }
+  },
+  timeout: 30000 // 30 second timeout
 });
 
 // Prevent Axios from making actual API calls when using mock
@@ -89,16 +91,24 @@ export const uploadDocuments = async (
       formData.append('collection_name', collectionName);
     }
     
+    // Encode the userId for the URL since it's now an email
+    const encodedUserId = encodeURIComponent(userId);
+    
     const response = await documentApi.post<DocumentUploadResponse>(
-      `/upload/${userId}`,
+      `/upload/${encodedUserId}`,
       formData,
       {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000 // Increase timeout to 60 seconds for file uploads specifically
       }
     );
     
     return response.data;
   } catch (error) {
+    if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
+      console.error('Upload timeout - the request took too long to complete');
+      throw new Error('Upload timeout - please try again with smaller files or check your connection');
+    }
     console.error('Error uploading documents:', error);
     throw error;
   }

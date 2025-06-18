@@ -10,12 +10,13 @@ import CallTypeSelector from "@/components/dashboard/CallTypeSelector";
 import AgentConfig from '@/components/dashboard/AgentConfig';
 import AgentControl from '@/components/dashboard/AgentControl';
 import CollectionsList from '@/components/dashboard/CollectionsList';
-import { Lock, Mail, Shield } from "lucide-react";
+import { Lock, Mail, Shield, AlertCircle } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import TutorialHints from "@/components/dashboard/TutorialHints";
 import { supabase } from "@/lib/supabase";
 
@@ -30,19 +31,38 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("upload");
   const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error || !session) {
-        router.push('/signin');
-        return;
-      }
+      try {
+        const { data: { session }, error: authError } = await supabase.auth.getSession();
+        
+        if (authError || !session) {
+          router.push('/signin');
+          return;
+        }
 
-      // Set the user ID from the authenticated user's email
-      setUserId(session.user.email || session.user.id);
-      setIsLoading(false);
+        // Check dashboard access in users table
+        const { data: userData, error: accessError } = await supabase
+          .from('users')
+          .select('dashboard_access, email')
+          .eq('id', session.user.id)
+          .single();
+
+        if (accessError || !userData?.dashboard_access) {
+          setAccessDenied(true);
+          setIsLoading(false);
+          return;
+        }
+
+        // Set the user ID from the authenticated user's email
+        setUserId(userData.email || session.user.id);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        router.push('/signin');
+      }
     };
 
     checkAuth();
@@ -226,6 +246,35 @@ export default function Dashboard() {
   // Don't render until mounted and auth is checked
   if (!isMounted || isLoading) {
     return null;
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-lg w-full">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+              <h2 className="text-2xl font-bold">Access Denied</h2>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert variant="destructive">
+              <AlertDescription>
+                Sorry, you do not have access to the dashboard at this time. Our team will reach out to you shortly.
+              </AlertDescription>
+            </Alert>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/')}
+              className="w-full"
+            >
+              Return to Home
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (

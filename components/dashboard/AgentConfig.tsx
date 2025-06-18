@@ -13,18 +13,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, ArrowRight, CheckCircle2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface AgentConfigProps extends UserIdProps {
   onNavigateTab?: (tab: string) => void;
 }
 
 export default function AgentConfig({ userId, onNavigateTab }: AgentConfigProps) {
+  const [activeTab, setActiveTab] = useState('basic');
   const { register, handleSubmit, formState: { isSubmitting } } = useForm<AgentConfigFormData>({
     defaultValues: {
       system_prompt: 'You are a helpful assistant. Provide accurate and concise information based on the documents provided.',
       voice: 'alloy',
-      model: 'gpt-4o-mini',
+      model: 'Nova-2 (General)',
       agent_name: 'Assistant',
+      openai_key: '',
+      deepgram_key: '',
+      cartesia_key: '',
     }
   });
   
@@ -47,56 +52,108 @@ export default function AgentConfig({ userId, onNavigateTab }: AgentConfigProps)
       <Card>
         <CardHeader>
           <CardTitle>Configure Agent</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Customize your agent's behavior and connect required services
+          </p>
         </CardHeader>
         <CardContent className="pb-20">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="system_prompt">System Prompt</Label>
-              <Textarea
-                id="system_prompt"
-                rows={4}
-                {...register('system_prompt', { required: true })}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="voice">Voice</Label>
-              <Select defaultValue="alloy" {...register('voice')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a voice" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="alloy">Alloy</SelectItem>
-                  <SelectItem value="echo">Echo</SelectItem>
-                  <SelectItem value="fable">Fable</SelectItem>
-                  <SelectItem value="nova">Nova</SelectItem>
-                  <SelectItem value="shimmer">Shimmer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="model">Model</Label>
-              <Select defaultValue="gpt-4o-mini" {...register('model')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a model" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
-                  <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="agent_name">Agent Name</Label>
-              <Input
-                id="agent_name"
-                placeholder="Assistant"
-                {...register('agent_name')}
-              />
-            </div>
-            
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <Tabs defaultValue="basic" className="space-y-6" value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+                <TabsTrigger value="basic">Basic Settings</TabsTrigger>
+                <TabsTrigger value="api">API Keys</TabsTrigger>
+                <TabsTrigger value="voice">Voice Settings</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="basic" className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="system_prompt">System Prompt</Label>
+                  <Textarea
+                    id="system_prompt"
+                    rows={4}
+                    {...register('system_prompt', { required: true })}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="voice">Voice</Label>
+                  <Select defaultValue="alloy" {...register('voice')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a voice" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alloy">Alloy</SelectItem>
+                      <SelectItem value="echo">Echo</SelectItem>
+                      <SelectItem value="fable">Fable</SelectItem>
+                      <SelectItem value="nova">Nova</SelectItem>
+                      <SelectItem value="shimmer">Shimmer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="api" className="space-y-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <Info className="h-5 w-5 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    These API keys are required for the agent to function properly. Keys are stored securely and only used to power your agent.
+                  </p>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="openai_key">OpenAI API Key</Label>
+                    <Input
+                      id="openai_key"
+                      type="password"
+                      placeholder="sk-..."
+                      {...register('openai_key')}
+                    />
+                    <p className="text-xs text-muted-foreground">Required for language model access</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="deepgram_key">Deepgram API Key</Label>
+                    <Input
+                      id="deepgram_key"
+                      type="password"
+                      placeholder="Your Deepgram API Key"
+                      {...register('deepgram_key')}
+                    />
+                    <p className="text-xs text-muted-foreground">Required for speech recognition</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cartesia_key">Cartesia API Key</Label>
+                    <Input
+                      id="cartesia_key"
+                      type="password"
+                      placeholder="Your Cartesia API Key"
+                      {...register('cartesia_key')}
+                    />
+                    <p className="text-xs text-muted-foreground">Required for text-to-speech</p>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="voice" className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="speech_model">Speech-to-Text Model</Label>
+                  <Select defaultValue="nova-2" {...register('model')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nova-2">Nova-2 (General)</SelectItem>
+                      <SelectItem value="nova-2-medical">Nova-2 (Medical)</SelectItem>
+                      <SelectItem value="nova-2-finance">Nova-2 (Finance)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Speech recognition model specialized for different domains</p>
+                </div>
+              </TabsContent>
+            </Tabs>
+
             <Button
               type="submit"
               disabled={isSubmitting}
