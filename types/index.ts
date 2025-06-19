@@ -24,6 +24,13 @@ export interface AgentConfig {
   model: string;
   agent_name?: string;
   language?: string;
+  openai_api_key?: string;
+  deepgram_api_key?: string;
+  cartesia_api_key?: string;
+  livekit_url?: string;
+  livekit_api_key?: string;
+  livekit_api_secret?: string;
+  sip_trunk_id?: string;
 }
 
 export interface ConfigResponse {
