@@ -15,6 +15,9 @@ import { Loader2, AlertTriangle, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+// Helper function to generate unique IDs for keys
+const generateId = () => Math.random().toString(36).substring(2, 9);
+
 export default function AgentControl({ userId }: UserIdProps) {
   const { register, handleSubmit, formState: { isSubmitting }, watch, setValue } = useForm<AgentControlFormData>({
     defaultValues: {
@@ -33,6 +36,11 @@ export default function AgentControl({ userId }: UserIdProps) {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [agentRunning, setAgentRunning] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // Generate stable keys for collections that won't change on re-render
+  const [collectionKeys] = useState(() => 
+    Array(20).fill(0).map(() => generateId())
+  );
   
   const currentAgentType = watch('agent_type');
   
@@ -144,17 +152,28 @@ export default function AgentControl({ userId }: UserIdProps) {
           <form onSubmit={handleSubmit(onStartAgent)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="collection">Collection</Label>
-              <Select defaultValue="default" {...register('collection_name')}>
+              <Select 
+                onValueChange={(value) => setValue('collection_name', value)}
+                defaultValue={collections.length > 0 ? collections[0].name : "default"}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a collection" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">Default Collection</SelectItem>
-                  {collections.map(collection => (
-                    <SelectItem key={collection.name} value={collection.name}>
-                      {collection.name}
+                  {collections.length === 0 ? (
+                    <SelectItem key="default-collection" value="default">
+                      Default Collection
                     </SelectItem>
-                  ))}
+                  ) : (
+                    collections.map((collection, index) => (
+                      <SelectItem 
+                        key={index < collectionKeys.length ? collectionKeys[index] : generateId()} 
+                        value={collection.name}
+                      >
+                        {collection.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

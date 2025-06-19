@@ -66,6 +66,18 @@ const mockAgents: Record<string, {
   running_time: number;
 }> = {};
 
+// Mock config object
+const mockConfig: AgentConfig = {
+  system_prompt: "You are a helpful AI assistant that provides accurate information based on the provided documents.",
+  voice: "alloy",
+  model: "gpt-4o-mini",
+  agent_name: "Replin AI",
+  language: "en",
+  openai_api_key: "sk-mock1234567890abcdefghijklmnopqrstuvwxyz",
+  deepgram_api_key: "dg-mockapikey123456789",
+  livekit_url: "wss://mock-project.livekit.cloud"
+};
+
 // Document Upload API
 export const uploadDocuments = async (
   userId: string,
@@ -114,6 +126,24 @@ export const uploadDocuments = async (
   }
 };
 
+export const fetchUserConfig = async (
+  userId: string
+): Promise<AgentConfig> => {
+  if (USE_MOCK) {
+    return Promise.resolve(mockConfig);
+  }
+
+  try {
+    // Encode the userId for the URL since it might be an email
+    const encodedUserId = encodeURIComponent(userId);
+    const response = await documentApi.get<AgentConfig>(`/config/${encodedUserId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching user configuration:', error);
+    throw error;
+  }
+};
+
 export const configureAgent = async (
   userId: string,
   config: AgentConfig
@@ -126,7 +156,9 @@ export const configureAgent = async (
   }
 
   try {
-    const response = await documentApi.post<ConfigResponse>(`/config/${userId}`, config);
+    // Encode the userId for the URL since it might be an email
+    const encodedUserId = encodeURIComponent(userId);
+    const response = await documentApi.post<ConfigResponse>(`/config/${encodedUserId}`, config);
     return response.data;
   } catch (error) {
     console.error('Error configuring agent:', error);
@@ -248,7 +280,7 @@ export const testStartAgent = async (userId: string): Promise<any> => {
     // Try with absolute minimal payload
     const minimalPayload = {
       user_id: userId,
-      agent_type: 'voice'
+      agent_type: 'web'
     };
     
     console.log("Testing with minimal payload:", JSON.stringify(minimalPayload));
@@ -256,11 +288,7 @@ export const testStartAgent = async (userId: string): Promise<any> => {
     const response = await agentManagerApi.post('/start-agent', minimalPayload);
     return response.data;
   } catch (error: any) {
-    console.error('Test API error:', error);
-    if (error.response) {
-      console.error('Test response status:', error.response.status);
-      console.error('Test response data:', JSON.stringify(error.response.data));
-    }
-    throw error;
+    console.error('Test start agent error:', error);
+    return { error: error.response?.data || error.message };
   }
 }; 
