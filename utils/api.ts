@@ -13,16 +13,16 @@ const USE_MOCK = false;
 
 // Set up Axios with default error handling
 const documentApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_DOCUMENT_API_URL || 'https://4774211ba3cbd8cdd4a264516b6e677b.loophole.site',
+  baseURL: process.env.NEXT_PUBLIC_DOCUMENT_API_URL || 'https://8d6408490cd55458d53886886d7f5902.loophole.site',
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
   },
-  timeout: 30000 // 30 second timeout
+  timeout: 120000 // Increased to 2 minutes to handle larger uploads
 });
 
 const agentManagerApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_AGENT_MANAGER_URL || 'https://2ac875c2f4b4cfc21930224edf3718e3.loophole.site',
+  baseURL: process.env.NEXT_PUBLIC_AGENT_MANAGER_URL || 'https://6873ce93e018e551c09de53a5bded472.loophole.site',
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -103,24 +103,16 @@ export const uploadDocuments = async (
       formData.append('collection_name', collectionName);
     }
     
-    // Encode the userId for the URL since it's now an email
-    const encodedUserId = encodeURIComponent(userId);
-    
     const response = await documentApi.post<DocumentUploadResponse>(
-      `/upload/${encodedUserId}`,
+      `/upload/${userId}`,
       formData,
       {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 60000 // Increase timeout to 60 seconds for file uploads specifically
       }
     );
     
     return response.data;
   } catch (error) {
-    if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
-      console.error('Upload timeout - the request took too long to complete');
-      throw new Error('Upload timeout - please try again with smaller files or check your connection');
-    }
     console.error('Error uploading documents:', error);
     throw error;
   }
@@ -134,9 +126,7 @@ export const fetchUserConfig = async (
   }
 
   try {
-    // Encode the userId for the URL since it might be an email
-    const encodedUserId = encodeURIComponent(userId);
-    const response = await documentApi.get<AgentConfig>(`/config/${encodedUserId}`);
+    const response = await documentApi.get<AgentConfig>(`/config/${userId}`);
     return response.data;
   } catch (error) {
     console.error('Error fetching user configuration:', error);
@@ -156,9 +146,7 @@ export const configureAgent = async (
   }
 
   try {
-    // Encode the userId for the URL since it might be an email
-    const encodedUserId = encodeURIComponent(userId);
-    const response = await documentApi.post<ConfigResponse>(`/config/${encodedUserId}`, config);
+    const response = await documentApi.post<ConfigResponse>(`/config/${userId}`, config);
     return response.data;
   } catch (error) {
     console.error('Error configuring agent:', error);

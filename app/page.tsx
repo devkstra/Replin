@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from "react"
 import { FileText, Zap, Code, Brain, Mic, ArrowRight, Check, Mail, MessageSquare, Menu, X, Clock, Users, DollarSign, Scale } from "lucide-react"
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase'
 import { 
   DocumentIcon,
   SparklesIcon,
@@ -176,7 +177,7 @@ const PricingCard = ({
         </div>
 
         <Button 
-          onClick={plan === 'Free' ? onAction : scrollToContact}
+          onClick={onAction}
           className={`w-full ${
             isPopular 
               ? 'bg-primary text-black hover:bg-primary/90' 
@@ -185,7 +186,7 @@ const PricingCard = ({
                 : 'bg-white/10 hover:bg-white/20 text-white'
           }`}
         >
-          {plan === 'Free' ? 'Start Free Trial' : 'Contact Sales'}
+          {ctaText}
         </Button>
       </div>
 
@@ -440,6 +441,8 @@ const ContactForm = () => {
 export default function Home() {
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -449,6 +452,20 @@ export default function Home() {
     
     checkMobile();
     window.addEventListener('resize', checkMobile);
+
+    // Check authentication status
+    const checkAuth = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (session && !error) {
+        setIsAuthenticated(true);
+        if (session.user?.email) {
+          setUserEmail(session.user.email);
+        }
+      }
+    };
+
+    checkAuth();
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -456,17 +473,158 @@ export default function Home() {
     router.push('/signin');
   };
 
-  const handleTryDemo = () => {
-    router.push('/signin?mode=demo');
+  const handleTryDemo = async () => {
+    if (isAuthenticated) {
+      // Check if user is a first-time user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('first_login')
+          .eq('id', user.id)
+          .single();
+
+        if (userData?.first_login) {
+          router.push('/demo');
+          return;
+        }
+      }
+      // For returning users, go to dashboard
+      router.push('/dashboard');
+    } else {
+      router.push('/signin?mode=demo');
+    }
   };
 
-  const handleContactSales = () => {
-    // Handle contact sales
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
+    setUserEmail(null);
+    router.push('/');
+  };
+
+  const handleContactSales = (plan: string) => {
+    router.push(`/sales?plan=${plan}`);
   };
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
+
+  // Update the desktop navigation buttons
+  const desktopNavButtons = (
+    <div className="ml-8 flex items-center space-x-4">
+      {isAuthenticated ? (
+        <>
+          <span className="text-sm text-gray-600">{userEmail}</span>
+          <Button 
+            variant="ghost"
+            className="text-sm text-gray-600 hover:bg-gray-100 hover:text-black"
+            onClick={handleSignOut}
+          >
+            Sign Out
+          </Button>
+          <Button 
+            onClick={() => router.push('/dashboard')}
+            className="group relative overflow-hidden rounded-full bg-black px-6 py-2 text-sm font-medium text-white hover:bg-black/90"
+          >
+            Dashboard
+            <motion.div
+              className="absolute inset-0 -z-10 translate-y-[100%] bg-white/10 transition-transform duration-300 group-hover:translate-y-0"
+            />
+          </Button>
+        </>
+      ) : (
+        <>
+          <Button 
+            variant="ghost"
+            className="text-sm text-gray-600 hover:bg-gray-100 hover:text-black"
+            onClick={handleSignIn}
+          >
+            Sign In
+          </Button>
+          <Button 
+            onClick={handleTryDemo}
+            className="group relative overflow-hidden rounded-full bg-black px-6 py-2 text-sm font-medium text-white hover:bg-black/90"
+          >
+            Try Demo
+            <motion.div
+              className="absolute inset-0 -z-10 translate-y-[100%] bg-white/10 transition-transform duration-300 group-hover:translate-y-0"
+            />
+          </Button>
+        </>
+      )}
+    </div>
+  );
+
+  // Update the mobile navigation
+  const mobileNavContent = (
+    <div className="mt-4 space-y-4 border-t border-gray-200 pt-4">
+      <Link 
+        href="#solution" 
+        className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
+      >
+        Home
+      </Link>
+      <Link 
+        href="#features" 
+        className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
+      >
+        Features
+      </Link>
+      <Link 
+        href="#replin-fm" 
+        className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
+      >
+        Replin FM
+      </Link>
+      <Link 
+        href="#problem" 
+        className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
+      >
+        Why Us
+      </Link>
+      <Link 
+        href="#pricing" 
+        className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
+      >
+        Pricing
+      </Link>
+      <Link 
+        href="#about" 
+        className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
+      >
+        Contact
+      </Link>
+      <div className="border-t border-gray-200 pt-4">
+        {isAuthenticated ? (
+          <>
+            <div className="px-4 py-2 text-sm text-gray-600">{userEmail}</div>
+            <Button 
+              onClick={() => router.push('/dashboard')}
+              className="w-full bg-black text-white hover:bg-black/90 mb-2"
+            >
+              Dashboard
+            </Button>
+            <Button 
+              onClick={handleSignOut}
+              variant="ghost"
+              className="w-full text-gray-600 hover:bg-gray-100"
+            >
+              Sign Out
+            </Button>
+          </>
+        ) : (
+          <Button 
+            onClick={handleTryDemo}
+            className="w-full bg-black text-white hover:bg-black/90"
+          >
+            Try Demo
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -513,24 +671,7 @@ export default function Home() {
                 <NavLink href="#about">Contact</NavLink>
               </div>
 
-              <div className="ml-8 flex items-center space-x-4">
-                <Button 
-                  variant="ghost"
-                  className="text-sm text-gray-600 hover:bg-gray-100 hover:text-black"
-                  onClick={handleSignIn}
-                >
-                  Sign In
-                </Button>
-                <Button 
-                  onClick={handleTryDemo}
-                  className="group relative overflow-hidden rounded-full bg-black px-6 py-2 text-sm font-medium text-white hover:bg-black/90"
-                >
-                  Try Demo
-                  <motion.div
-                    className="absolute inset-0 -z-10 translate-y-[100%] bg-white/10 transition-transform duration-300 group-hover:translate-y-0"
-                  />
-                </Button>
-              </div>
+              {desktopNavButtons}
             </div>
 
             {/* Mobile Menu Button */}
@@ -554,52 +695,7 @@ export default function Home() {
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="mt-4 space-y-4 border-t border-gray-200 pt-4">
-              <Link 
-                href="#solution" 
-                className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
-              >
-                Home
-              </Link>
-              <Link 
-                href="#features" 
-                className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
-              >
-                Features
-              </Link>
-              <Link 
-                href="#replin-fm" 
-                className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
-              >
-                Replin FM
-              </Link>
-              <Link 
-                href="#problem" 
-                className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
-              >
-                Why Us
-              </Link>
-              <Link 
-                href="#pricing" 
-                className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
-              >
-                Pricing
-              </Link>
-              <Link 
-                href="#about" 
-                className="block px-4 py-2 text-sm text-gray-600 hover:text-black"
-              >
-                Contact
-              </Link>
-              <div className="border-t border-gray-200 pt-4">
-                <Button 
-                  onClick={handleTryDemo}
-                  className="w-full bg-black text-white hover:bg-black/90"
-                >
-                  Try Demo
-                </Button>
-              </div>
-            </div>
+            {mobileNavContent}
           </motion.div>
         </nav>
 
@@ -643,15 +739,15 @@ export default function Home() {
                   <p className="text-xl text-black/80 mb-8">
                     Create Voice agents like never before
                   </p>
-                  <button 
+                  <Button 
                     onClick={handleTryDemo}
                     className="px-6 py-3 text-white bg-black hover:bg-black/90 transition-colors inline-flex items-center gap-2"
                   >
-                    Try demo
+                    {isAuthenticated ? 'Go to Dashboard' : 'Try Demo'}
                     <svg className="w-4 h-4 transform rotate-45" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                       <path d="M7 17L17 7M17 7H7M17 7V17" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                  </button>
+                  </Button>
                 </motion.div>
               </div>
 
@@ -1086,7 +1182,7 @@ export default function Home() {
               />
               <PricingCard
                 plan="Pro"
-                price="199"
+                price="Custom"
                 description="Ideal for growing businesses"
                 features={[
                   "10,000 minutes per month",
@@ -1099,7 +1195,7 @@ export default function Home() {
                 isPopular={true}
                 ctaText="Contact Sales"
                 index={1}
-                onAction={handleTryDemo}
+                onAction={() => handleContactSales('Pro')}
               />
               <PricingCard
                 plan="Enterprise"
@@ -1116,7 +1212,7 @@ export default function Home() {
                 isPopular={false}
                 ctaText="Contact Sales"
                 index={2}
-                onAction={handleTryDemo}
+                onAction={() => handleContactSales('Enterprise')}
               />
             </div>
 

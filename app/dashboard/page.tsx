@@ -46,7 +46,7 @@ export default function Dashboard() {
         // Check dashboard access in users table
         const { data: userData, error: accessError } = await supabase
           .from('users')
-          .select('dashboard_access, email')
+          .select('dashboard_access, email, name')
           .eq('id', session.user.id)
           .single();
 
@@ -56,8 +56,8 @@ export default function Dashboard() {
           return;
         }
 
-        // Set the user ID from the authenticated user's email
-        setUserId(userData.email || session.user.id);
+        // Set the user ID from the authenticated user's name, falling back to email or id
+        setUserId(userData.name || userData.email || session.user.id);
         setIsLoading(false);
       } catch (error) {
         console.error('Error checking auth:', error);
@@ -254,14 +254,14 @@ export default function Dashboard() {
         <Card className="max-w-lg w-full">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <AlertCircle className="h-6 w-6 text-destructive" />
-              <h2 className="text-2xl font-bold">Access Denied</h2>
+              <AlertCircle className="h-6 w-6 text-primary" />
+              <h2 className="text-2xl font-bold">Limited Access</h2>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Alert variant="destructive">
-              <AlertDescription>
-                Sorry, you do not have access to the dashboard at this time. Our team will reach out to you shortly.
+            <Alert>
+              <AlertDescription className="text-center py-2">
+                Due to high demand, dashboard access is currently limited to selected users. We'd love to give you a personalized demo of our powerful features. Our team will contact you shortly to schedule an exclusive walkthrough.
               </AlertDescription>
             </Alert>
             <Button
