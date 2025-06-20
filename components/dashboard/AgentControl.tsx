@@ -278,7 +278,7 @@ export default function AgentControl({ userId }: UserIdProps) {
                       "h-6 w-6"
                     )}
                     onClick={() => {
-                      navigator.clipboard.writeText('https://front-six-gules.vercel.app/voice-chat');
+                      navigator.clipboard.writeText('https://front-end-mahasahyak.vercel.app/voice-chat');
                       toast.success('Link copied to clipboard!');
                     }}
                   >
