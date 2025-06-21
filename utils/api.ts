@@ -13,7 +13,7 @@ const USE_MOCK = false;
 
 // Set up Axios with default error handling
 const documentApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_DOCUMENT_API_URL || 'https://8d6408490cd55458d53886886d7f5902.loophole.site',
+  baseURL: process.env.NEXT_PUBLIC_DOCUMENT_API_URL || 'https://0a0ccdad81974159c1f5385375aafe6b.loophole.site',
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -22,12 +22,21 @@ const documentApi = axios.create({
 });
 
 const agentManagerApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_AGENT_MANAGER_URL || 'https://6873ce93e018e551c09de53a5bded472.loophole.site',
+  baseURL: process.env.NEXT_PUBLIC_AGENT_MANAGER_URL || 'https://c55dc6fef6e8b4fcc109d9ef6bfe7129.loophole.site',
   headers: {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
   },
   timeout: 30000 // 30 second timeout
+});
+
+const defaultKeysApi = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_DEFAULT_KEYS_URL || 'https://52ae9a436a9eead142b7dbca37dc373e.loophole.site',
+  headers: {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  },
+  timeout: 10000
 });
 
 // Prevent Axios from making actual API calls when using mock
@@ -62,7 +71,7 @@ const mockCollections = [
 
 const mockAgents: Record<string, {
   user_id: string;
-  agent_type: 'voice' | 'web';
+  agent_type: 'voice' | 'web' | 'dialer';
   running_time: number;
 }> = {};
 
@@ -146,7 +155,44 @@ export const configureAgent = async (
   }
 
   try {
-    const response = await documentApi.post<ConfigResponse>(`/config/${userId}`, config);
+    // List of API key fields that need fallback handling
+    const apiKeyFields = [
+      'openai_api_key',
+      'deepgram_api_key',
+      'cartesia_api_key',
+      'livekit_url',
+      'livekit_api_key',
+      'livekit_api_secret',
+      'sip_trunk_id'
+    ];
+
+    // Create a copy of the config to modify
+    const finalConfig = { ...config };
+
+    // Check each API key field
+    for (const keyField of apiKeyFields) {
+      // If the field is empty or undefined
+      if (!finalConfig[keyField as keyof AgentConfig]) {
+        try {
+          // Fetch default value from the default keys service
+          const defaultResponse = await defaultKeysApi.get<{
+            service_key_name: string;
+            value: string | null;
+            message: string;
+          }>(`/default-value/${keyField}`);
+
+          if (defaultResponse.data.value) {
+            finalConfig[keyField as keyof AgentConfig] = defaultResponse.data.value;
+          }
+        } catch (defaultKeyError) {
+          console.warn(`Failed to fetch default value for ${keyField}:`, defaultKeyError);
+          // Continue with empty value if default fetch fails
+        }
+      }
+    }
+
+    // Make the final configuration request with potentially filled default values
+    const response = await documentApi.post<ConfigResponse>(`/config/${userId}`, finalConfig);
     return response.data;
   } catch (error) {
     console.error('Error configuring agent:', error);
@@ -175,7 +221,7 @@ export const startAgent = async (
   userId: string,
   collectionName?: string | null,
   phoneNumber?: string | null,
-  agentType: 'voice' | 'web' = 'voice'
+  agentType: 'voice' | 'web' | 'dialer' = 'voice'
 ): Promise<AgentResponse> => {
   if (USE_MOCK) {
     // Add mock agent to the list

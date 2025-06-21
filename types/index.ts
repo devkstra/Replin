@@ -73,7 +73,7 @@ export interface AgentConfigFormData extends AgentConfig {}
 export interface AgentControlFormData {
   collection_name?: string;
   phone_number?: string;
-  agent_type: 'voice' | 'web';
+  agent_type: 'dialer' | 'web';
 }
 
 // Component props

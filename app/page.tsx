@@ -161,8 +161,7 @@ const PricingCard = ({
         <p className="mb-6 text-base text-white/60">{description}</p>
         
         <div className="mb-6">
-          <span className="text-4xl font-bold text-white">${price}</span>
-          {price !== 'Custom' && <span className="text-white/60">/month</span>}
+          <span className="text-4xl font-bold text-white">₹{price}</span>
         </div>
 
         <div className="mb-8 space-y-4">
@@ -1165,15 +1164,13 @@ export default function Home() {
             {/* Pricing Grid */}
             <div className="grid gap-8 md:grid-cols-3">
               <PricingCard
-                plan="Free"
+                plan="Free Demo"
                 price="0"
                 description="Perfect for trying out Replin AI"
                 features={[
-                  "100 minutes per month",
-                  "1 AI agent",
-                  "Basic voice customization",
-                  "Community support",
-                  "Basic analytics"
+                  "One to one Demo",
+                  "Special mentoring on using Replin AI",
+                  "Exploration of tools & Features"
                 ]}
                 isPopular={false}
                 ctaText="Start Free Trial"
@@ -1181,15 +1178,15 @@ export default function Home() {
                 onAction={handleTryDemo}
               />
               <PricingCard
-                plan="Pro"
-                price="Custom"
+                plan="Pay as you go"
+                price="6 per minute"
                 description="Ideal for growing businesses"
                 features={[
-                  "10,000 minutes per month",
-                  "10 concurrent AI agents",
-                  "Advanced voice customization",
+                  "Minutes per request",
+                  "1/more AI agents",
+                  "Advanced training",
                   "Priority support",
-                  "Advanced analytics",
+                  "Embedding support", 
                   "API access"
                 ]}
                 isPopular={true}
@@ -1202,12 +1199,11 @@ export default function Home() {
                 price="Custom"
                 description="For large-scale deployments"
                 features={[
-                  "Unlimited minutes",
-                  "Unlimited AI agents",
+                  "Custom minutes",
+                  "Custom AI agents",
                   "Custom voice development",
                   "24/7 dedicated support",
-                  "Custom integrations",
-                  "SLA guarantees"
+                  "Custom integrations"
                 ]}
                 isPopular={false}
                 ctaText="Contact Sales"

@@ -21,7 +21,7 @@ const generateId = () => Math.random().toString(36).substring(2, 9);
 export default function AgentControl({ userId }: UserIdProps) {
   const { register, handleSubmit, formState: { isSubmitting }, watch, setValue } = useForm<AgentControlFormData>({
     defaultValues: {
-      agent_type: 'voice'
+      agent_type: 'dialer'
     }
   });
   
@@ -89,7 +89,7 @@ export default function AgentControl({ userId }: UserIdProps) {
         success: true,
         message: result.status === 'already_running' 
           ? 'Agent is already running'
-          : data.agent_type === 'voice'
+          : data.agent_type === 'dialer'
             ? 'Agent started successfully. You can call on +19592142164'
             : 'Agent started successfully. You can access the web interface at https://front-six-gules.vercel.app/voice-chat'
       });
@@ -196,12 +196,15 @@ export default function AgentControl({ userId }: UserIdProps) {
               <Label>Agent Type</Label>
               <RadioGroup 
                 value={watch('agent_type')} 
-                onValueChange={(value: 'voice' | 'web') => setValue('agent_type', value)} 
+                onValueChange={(value: 'web' | 'dialer') => setValue('agent_type', value)} 
                 className="flex gap-4"
               >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="voice" id="voice" />
-                  <Label htmlFor="voice">Voice Agent</Label>
+                <div className="flex items-center space-x-2 opacity-50">
+                  <RadioGroupItem value="dialer" id="dialer" disabled />
+                  <Label htmlFor="dialer" className="cursor-not-allowed">
+                    Dialer Agent
+                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded ml-2">Coming Soon</span>
+                  </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="web" id="web-agent" />
