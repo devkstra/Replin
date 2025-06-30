@@ -711,6 +711,22 @@ export default function Home() {
       <main>
         {/* Hero Section */}
         <section id="solution" className="relative min-h-screen">
+          {/* Bolt Badge - Moved to top layer */}
+          <Link 
+            href="https://bolt.new" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="fixed top-24 right-8 z-50 transition-all duration-300 hover:brightness-125"
+          >
+            <Image 
+              src="/white_circle_360x360.png"
+              alt="Bolt Badge"
+              width={80}
+              height={80}
+              priority
+            />
+          </Link>
+
           {/* Background Image */}
           <div className="absolute inset-0 z-0">
             <Image 
@@ -755,7 +771,7 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="mt-8 lg:mt-0"
+                className="mt-32 lg:mt-32"
               >
                 <Link href="#replin-fm" className="block">
                   <div className="bg-white/80 backdrop-blur-sm p-4 rounded-sm border border-black/10 hover:bg-white/90 transition-all transform hover:scale-105">
